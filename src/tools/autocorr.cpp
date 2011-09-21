@@ -5,7 +5,10 @@
 using namespace toolbox;
 #include <fstream>
 #include <iomanip>
-                 void banner() 
+
+
+
+void banner() 
 {
     std::cerr
             << " USAGE: autocorr -maxlag max-lag [-timestep unit-time]                          \n"
