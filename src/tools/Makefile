@@ -1,16 +1,31 @@
--include ../make.in
-.PHONY: all clean
+-include ../../make.in
 
-CXXINC:=$(CXXINC) -I../libs
+SOURCES=$(shell ls *.cpp)
+OBJECTS=$(SOURCES:.cpp=.o)
+DEPENDS=$(SOURCES:.cpp=.d)
 TOOLS=autocorr crosscorr gaussmix histogram ndhistogram trajworks
+.PHONY: all clean $(TOOLS)
+
+CXXFLAGS:=$(CXXFLAGS) -I../libs
 
 all: $(TOOLS)
 
-$(TOOLS): % : %.cpp
-	$(CXX) $(CXXFLAGS) $(CXXINC) -o $@ $< $(LDFLAGS)
+-include $(DEPENDS)
+%.d: %.cpp
+	$(MAKEDEPEND) $< > $@.$$$$;                      \
+           sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@;     \
+           rm -f $@.$$$$
 
-trajworks: trajworks.cpp
-	$(CXX) -D__USEREGEX $(CXXFLAGS) $(CXXINC) -o $@ $< $(LDFLAGS) -lboost_regex
- 
+trajworks.o: trajworks.cpp trajworks.d
+	$(CXX) -c  -D__USEREGEX $(CXXFLAGS) -o $@ $< $(LDFLAGS) 
+
 clean:
-	rm -f $(TOOLS)
+	rm -f $(OBJECTS) $(DEPENDS)
+
+# generates -- and targets -- executables in another directory
+$(TOOLS): % : ../../bin/%
+$(TOOLS:%=../../bin/%): ../../bin/%: %.o 
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
+../../bin/trajworks: trajworks.o
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) -lboost_regex
