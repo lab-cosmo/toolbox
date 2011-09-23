@@ -99,7 +99,10 @@ public:
         return *this;
     }
     
-    FTensor(const point_type& ndim=fixarray<index_type, order>(0), const data_type& v=(data_type) 0.) : wdim(ndim) {  data.resize(size()); if (size()>0) data=v; }
+    FTensor(
+            const point_type& ndim=(fixarray<index_type, order >)(0), 
+            const data_type& v=(data_type) 0.) : wdim(ndim) {  data.resize(size()); if (size()>0) data=v; }
+
     /*
     //constructors
     FMatrix(const index_type& r=0, const index_type& c=0, const data_type& v=(data_type) 0.) : wc(c), wr(r),  data(v, r*c) {}
