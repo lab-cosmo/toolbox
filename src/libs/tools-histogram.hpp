@@ -268,6 +268,10 @@ public:
 //syntactic sugar to insert a new element into the series, to move to next or previous series
     inline void operator << (const std::valarray<U>& nel) { add(nel); }
     
+    double max() const { return bins.max()/ndata; }
+    double min() const { return bins.min()/ndata; }
+    
+    
     void get_bins(std::valarray<double>& rbins) const
     {
         rbins.resize(bins.size());
