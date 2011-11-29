@@ -24,24 +24,6 @@ void banner()
             << "    log(min,max,drad) uses logarithm of the ratio and a sigmoid function        \n";
 }
 
-void ssplit(const std::string&  istr, std::vector<double>& vl)
-{
-    vl.clear(); std::string ls=istr;
-    int pos=0;
-    
-    while( (pos = ls.find_first_of(',')) != ls.npos )
-    {
-        if(pos > 0)
-        {
-            vl.push_back(str2float(ls.substr(0,pos)));
-        }
-        ls=ls.substr(pos+1);
-    }
-    if(ls.length() > 0)
-    {
-        vl.push_back(str2float(ls));
-    }
-}
 
 double (* as_radius) (const std::vector<double>& op, double val);
 
@@ -71,7 +53,7 @@ int main(int argc, char **argv)
 {
     
     CLParser clp(argc, argv);
-    bool fhelp, fweighted, fgnu;
+    bool fhelp, fweighted, fgnu, fperiodic;
     std::string a,b,wb,nbins,asmooth,asfun;
     unsigned long ndim;
     bool fok=
@@ -83,19 +65,23 @@ int main(int argc, char **argv)
             clp.getoption(asmooth,"as",std::string("")) &&
             clp.getoption(asfun,"asf",std::string("linear")) &&
             clp.getoption(fweighted,"w",false) &&
+            clp.getoption(fperiodic,"p",false) &&
             clp.getoption(fgnu,"g",false) &&
             clp.getoption(fhelp,"h",false);
     
     if ( fhelp || ! fok) { banner(); return 0; }
     
     std::valarray<HGOptions<Histogram<double> > >hgo(ndim);
-    std::vector<double> va, vb, vw, vn, asop;
-    ssplit(a,va); ssplit(b,vb); ssplit(wb,vw); ssplit(nbins,vn);
+    std::valarray<double> va, vb, vw, vn, vasop; std::vector<double> asop;
+    csv2floats(a,va); csv2floats(b,vb); csv2floats(wb,vw); csv2floats(nbins,vn); 
+    std::valarray<double> pva(va), pvb(vb); //extended intervals for periodic
+    std::valarray<int> pbin(ndim);
     
+    //sets up adaptive smoothing (beta)
     std::string asmode, aspars;
     if (asmooth.size()>0) {
       asmode=asmooth.substr(0,asmooth.find("(",0)); aspars=asmooth.substr(asmooth.find("(",0)+1,asmooth.find(")",0)-1-asmooth.find("(",0));
-      ssplit(aspars,asop); 
+      csv2floats(aspars,vasop);  for (int i=0; i<vasop.size(); i++) asop.push_back(vasop[i]);
       if (asmode==std::string("linear")) as_radius=&asr_linear; 
       else if (asmode==std::string("log")) as_radius=&asr_log;
       else ERROR("Undefined smoothing mode "<<asmode); 
@@ -112,11 +98,24 @@ int main(int argc, char **argv)
     if ((vn.size()!=ndim && vn.size()!=0)||(vw.size()!=ndim && vw.size()!=0)) ERROR("N. bins and width must be given for all dimensions, if specified.");
     for (int i=0; i<ndim; ++i)
     {
-        hgo[i].window=(vw.size()==0?HGWDelta:HGWBox);
-        hgo[i].window_width=(vw.size()==0?0.:vw[i]);
+        hgo[i].window=(vw.size()==0?HGWDelta:HGWTriangle);
+        hgo[i].window_width=(vw.size()==0 || hgo[i].window==HGWDelta?0.:vw[i]);
         hgo[i].boundaries.resize((vn.size()==0?101:vn[i]+1));
-        for (int k=0; k<hgo[i].boundaries.size();k++)
-            hgo[i].boundaries[k]=va[i]+k*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
+        if (!fperiodic)
+        {
+           for (int k=0; k<hgo[i].boundaries.size();k++)
+             hgo[i].boundaries[k]=va[i]+k*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
+        }
+        else
+        {
+           //allocates extra buffer for the tails of the kernels to be folded back into the period
+           pbin[i]=ceil((hgo[i].boundaries.size()-1.0)*hgo[i].window_width/(vb[i]-va[i]));
+           double buf=pbin[i]*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
+           pva[i]=va[i]-buf; pvb[i]=vb[i]+buf; 
+           hgo[i].boundaries.resize(hgo[i].boundaries.size()+2*pbin[i]);
+           for (int k=0; k<hgo[i].boundaries.size();k++)
+             hgo[i].boundaries[k]=pva[i]+k*(pvb[i]-pva[i])/(hgo[i].boundaries.size()-1);
+        }           
     }
     
     NDHistogram<double> HG(hgo);
@@ -137,13 +136,14 @@ int main(int argc, char **argv)
     HG.get_outliers(outliers);
     std::cout<<"# Fraction outside: "<<outliers<<std::endl;
     std::cout.setf(std::ios::scientific);
-    if (asmooth=="") {
+    if (asmooth=="") { 
     if (!fgnu) std::cout <<HG; 
     else
     {
-        
+        //ALSO PERIODIC ACTUALLY WORKS ONLY IN 2D. TOTALLY NEEDS CLEANING UP AND GENERALIZING!!!  
         if (ndim!=2) ERROR("GNUPLOT format works only for dimension 2\n");
         std::valarray<long> ind(2); std::valarray<double> cen(2); double val;
+        if (!fperiodic)
         for (int i=0; i<hgo[0].boundaries.size()-1; ++i) 
         {
             for (int j=0; j<hgo[1].boundaries.size()-1; ++j)
@@ -153,6 +153,48 @@ int main(int argc, char **argv)
                 std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<val<<"\n";
             }
             std::cout<<std::endl;
+        }
+        else
+        {
+        std::valarray<double> pcen(2); double pval; 
+        long bs[2];
+        bs[0]=hgo[0].boundaries.size()-1-pbin[0]*2;
+        bs[1]=hgo[1].boundaries.size()-1-pbin[1]*2;        
+        for (int i=pbin[0]; i<hgo[0].boundaries.size()-1-pbin[0]; ++i) 
+        {
+            for (int j=pbin[1]; j<hgo[1].boundaries.size()-1-pbin[1]; ++j)
+            {
+                ind[0]=i; ind[1]=j;
+                HG.get_bin(ind,cen,val); //this is the centre
+                if (i<pbin[0]*2) {
+                  ind[0]=i+bs[0];
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                  if (j<pbin[1]*2) {
+                  ind[1]=j+bs[1]; 
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                  }
+                }
+                if (j<pbin[1]*2) {
+                  ind[1]=j+bs[1];  ind[0]=i;
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                }
+                if (i>=bs[0]) {
+                  ind[0]=i-bs[0];
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                  if (j>=bs[1]) {
+                  ind[1]=j-bs[1];
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                  }
+                }
+                if (j>=bs[1]) {
+                  ind[1]=j-bs[1]; ind[0]=i;
+                  HG.get_bin(ind,pcen,pval); val+=pval;
+                }
+                  
+                std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<val<<"\n";
+            }
+            std::cout<<std::endl;
+        }
         }
     }
     } else {

@@ -1,6 +1,6 @@
 #define __EXTERNALS 1
 #include "tbdefs.hpp"
-
+#include <vector>
 //externals and very simple general-purpose functions
 
 namespace toolbox {
@@ -43,5 +43,27 @@ namespace toolbox{
         sstr << ival;
         std::string rval; sstr >> rval;
         return rval;
+    }
+
+    void csv2floats(const std::string&  istr, std::valarray<double>& vv)
+    {
+        std::vector<double> vl;
+        vl.clear(); std::string ls=istr;
+        int pos=0;
+        
+        while( (pos = ls.find_first_of(',')) != ls.npos )
+        {
+            if(pos > 0)
+            {
+                vl.push_back(str2float(ls.substr(0,pos)));
+            }
+            ls=ls.substr(pos+1);
+        }
+        if(ls.length() > 0)
+        {
+            vl.push_back(str2float(ls));
+        }
+        vv.resize(vl.size()); //copies onto a valarray
+        for (int k=0; k<vl.size(); k++) vl[k]=vv[k];
     }
 };

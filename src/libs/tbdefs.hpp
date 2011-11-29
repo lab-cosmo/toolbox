@@ -95,6 +95,7 @@ namespace toolbox{
     int str2int(const std::string& str);
     std::string int2str(const long& ival);
     std::string float2str(const double& ival);
+    void csv2floats(const std::string&  istr, std::valarray<double>& vl);
 };
 
 /**************************************
