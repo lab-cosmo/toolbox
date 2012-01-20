@@ -1,3 +1,9 @@
+/* Toolbox library. A few simple functions used all around.
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+
 #define __EXTERNALS 1
 #include "tbdefs.hpp"
 #include <vector>
@@ -47,10 +53,9 @@ namespace toolbox{
 
     void csv2floats(const std::string&  istr, std::valarray<double>& vv)
     {
-        std::vector<double> vl;
+        std::vector<double> vl(0);
         vl.clear(); std::string ls=istr;
         int pos=0;
-        
         while( (pos = ls.find_first_of(',')) != ls.npos )
         {
             if(pos > 0)
@@ -64,6 +69,6 @@ namespace toolbox{
             vl.push_back(str2float(ls));
         }
         vv.resize(vl.size()); //copies onto a valarray
-        for (int k=0; k<vl.size(); k++) vl[k]=vv[k];
+        for (int k=0; k<vl.size(); k++) vv[k]=vl[k];
     }
 };

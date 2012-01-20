@@ -1,3 +1,10 @@
+/* A library to convert between units of measure
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+
+
 #ifndef __CONV_UNITS_HPP
 #define __CONV_UNITS_HPP
 #include "tbdefs.hpp"

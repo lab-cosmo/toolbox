@@ -1,6 +1,7 @@
 #include "tbdefs.hpp"
 #include "tools-histogram.hpp"
 #include "clparser.hpp"
+#include "ioparser.hpp"
 
 using namespace toolbox;
 #include <fstream>
@@ -15,7 +16,7 @@ void banner()
             << " data must be formatted as                                                      \n"
             << " D1(1)   D2(1)  .......   DN(1) [ WEIGHT(1) ]                                   \n"
             << " on every dimension n (default:100) bins are distributed evenly.                \n"
-            << " between xi and xf. optionally, box (b) smoothing functions can be used.        \n"
+            << " between xi and xf. optionally, triangle (b) smoothing functions can be used.     \n"
             << " If dimension is 2 and -g is selected, points will be output in gnuplot format. \n"
             << " If -w is selected, then a weight is read after each point.                     \n"
             << " If -as is selected, the final histogram will be smoothed adaptively, with      \n"
@@ -76,7 +77,6 @@ int main(int argc, char **argv)
     csv2floats(a,va); csv2floats(b,vb); csv2floats(wb,vw); csv2floats(nbins,vn); 
     std::valarray<double> pva(va), pvb(vb); //extended intervals for periodic
     std::valarray<int> pbin(ndim);
-    
     //sets up adaptive smoothing (beta)
     std::string asmode, aspars;
     if (asmooth.size()>0) {
@@ -134,7 +134,10 @@ int main(int argc, char **argv)
     
     double outliers;
     HG.get_outliers(outliers);
-    std::cout<<"# Fraction outside: "<<outliers<<std::endl;
+    std::cout<<"# Fraction outside: "<<outliers;
+    if (vw.size()>0) 
+    { std::cout<< "  --  triangle kernel binning:  widths  "; for (int i=0; i<ndim; i++) std::cout<<vw[i]<<"  "; }
+    std::cout<<"\n";
     std::cout.setf(std::ios::scientific);
     if (asmooth=="") { 
     if (!fgnu) std::cout <<HG; 

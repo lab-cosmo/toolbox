@@ -1,3 +1,9 @@
+/* Minimal supprt for reading and writing atomic data.
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+
 #ifndef __IOATOMS_H
 #define __IOATOMS_H
 

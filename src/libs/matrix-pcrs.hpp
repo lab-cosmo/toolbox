@@ -1,3 +1,9 @@
+/* A Parallel Compressed Row Storage matrix format
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+
 #ifdef TB_MPI //we don't include if MPI is not active
 #ifndef __MATRIX_PCRS_H
 #define __MATRIX_PCRS_H

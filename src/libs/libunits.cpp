@@ -1,3 +1,9 @@
+/* A library to convert between units of measure
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+
 #include "conv-units.hpp"
 
 namespace toolbox {

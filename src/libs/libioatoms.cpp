@@ -1,3 +1,9 @@
+/* Read and write a few atomic data formats.
+   --------------------------------------------------
+   Author: Michele Ceriotti, 2008
+   Distributed under the GNU General Public License  
+*/
+   
 #include "ioatoms.hpp"
 #include <string>
 #include <iostream>
