@@ -366,6 +366,7 @@ void banner()
             << " ## projected momentum ( -pproj )                                               \n"
             << " -ppat1     label of the monitored specie [*]                                   \n"
             << " -ppat2     label of specie to look for nearest bond [*]                        \n"
+            << " ## thermal ellipsoid tensor ( -thermal )                                       \n"            //may want to include options for center of mass removal and Berry phase
             ;
 }
 
@@ -373,7 +374,7 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
     
-    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fhelp;
+    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
@@ -451,7 +452,10 @@ int main(int argc, char **argv)
             clp.getoption(lppat2,"ppat2",std::string("*")) &&
             //dipole options
             clp.getoption(fdipole,"dpl",false) &&
-            clp.getoption(fhelp,"h",false);
+            clp.getoption(fhelp,"h",false)&&
+            //thermal ellipsoids options
+            clp.getoption(fthermal,"-thermal",false)            
+            ;
 
     
     if (fhelp || ! fok) { banner(); exit(-1); }
@@ -552,14 +556,17 @@ int main(int argc, char **argv)
     }
     NDHistogram<double> p3dh(p3dhgo);
     
+    //thermal ellipsoids stuff
+    FMatrix<double> te_u0, te_uiuj;
+    
     //initializes output streams
-    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj;
+    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm;
     std::cout.precision(8); std::cout.width(15); std::cout.setf(std::ios::scientific);
     
     if (prefix=="")
     {
         //everything goes to stdout
-        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=&std::cout;
+        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=&std::cout;
     }
     else
     { 
@@ -625,6 +632,11 @@ int main(int argc, char **argv)
                 (*opcaxyz).precision(8); (*opcaxyz).width(15); (*opcaxyz).setf(std::ios::scientific); 
             }
         }
+        if (fthermal) 
+        {
+            otherm=new std::ofstream((prefix+std::string(".therm")).c_str());
+            (*otherm).precision(8); (*otherm).width(15); (*otherm).setf(std::ios::scientific); 
+        }        
     }
     
     //someone might need a gaussian prn
@@ -731,6 +743,28 @@ int main(int argc, char **argv)
                 }
                 uwframe=af;
             }
+        }
+        if (fthermal)
+        {
+            if (te_u0.size()==0)
+            {
+               //initializes vectors for average positions and variance
+               te_u0.resize(af.ats.size(),3);
+               te_uiuj.resize(af.ats.size(),6);                              
+               te_u0=0.0; te_uiuj=0.0;
+            }
+             for (int i=0; i<af.ats.size(); ++i)
+             {
+               te_u0(i,0)+=af.ats[i].x;
+               te_u0(i,1)+=af.ats[i].y;
+               te_u0(i,2)+=af.ats[i].z;
+               te_uiuj(i,0)+=af.ats[i].x*af.ats[i].x;
+               te_uiuj(i,1)+=af.ats[i].y*af.ats[i].y;
+               te_uiuj(i,2)+=af.ats[i].z*af.ats[i].z;
+               te_uiuj(i,3)+=af.ats[i].x*af.ats[i].y;
+               te_uiuj(i,4)+=af.ats[i].x*af.ats[i].z;
+               te_uiuj(i,5)+=af.ats[i].y*af.ats[i].z;               
+             }                    
         }
         if (fdens) 
         {
@@ -1593,6 +1627,20 @@ int main(int argc, char **argv)
                 (*opca)<<Q(3*j,i)<<"  "<<Q(3*j+1,i)<<"  "<<Q(3*j+2,i)<<std::endl;
         }*/
         }
+    }
+    
+    if (fthermal)
+    {
+        (*otherm) <<"Thermal ellipsoids: Uxx Uyy Uzz Uxy Uxz Uyz\n";
+        for (int i=0; i<te_u0.rows(); i++)
+        {
+             (*otherm)<< te_uiuj(i,0)/npfr-te_u0(i,0)*te_u0(i,0)/(npfr*npfr)<< "   "
+                      << te_uiuj(i,1)/npfr-te_u0(i,1)*te_u0(i,1)/(npfr*npfr)<< "   "
+                      << te_uiuj(i,2)/npfr-te_u0(i,2)*te_u0(i,2)/(npfr*npfr)<< "   "
+                      << te_uiuj(i,3)/npfr-te_u0(i,0)*te_u0(i,1)/(npfr*npfr)<< "   "
+                      << te_uiuj(i,4)/npfr-te_u0(i,0)*te_u0(i,2)/(npfr*npfr)<< "   "
+                      << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;        
+        }   
     }
     return 0;
 }
