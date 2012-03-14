@@ -753,7 +753,7 @@ int main(int argc, char **argv)
                te_uiuj.resize(af.ats.size(),6);                              
                te_u0=0.0; te_uiuj=0.0;
             }
-             for (int i=0; i<af.ats.size(); ++i)
+            for (int i=0; i<af.ats.size(); ++i)
              {
                te_u0(i,0)+=af.ats[i].x;
                te_u0(i,1)+=af.ats[i].y;
@@ -1359,8 +1359,21 @@ int main(int argc, char **argv)
             
             odpov->flush();
         }
-        
-        
+
+        if (fthermal)
+        {
+            (*otherm) <<"Thermal ellipsoids: Uxx Uyy Uzz Uxy Uxz Uyz\n";
+            for (int i=0; i<te_u0.rows(); i++)
+            {
+                 (*otherm)<< te_uiuj(i,0)/npfr-te_u0(i,0)*te_u0(i,0)/(npfr*npfr)<< "   "
+                          << te_uiuj(i,1)/npfr-te_u0(i,1)*te_u0(i,1)/(npfr*npfr)<< "   "
+                          << te_uiuj(i,2)/npfr-te_u0(i,2)*te_u0(i,2)/(npfr*npfr)<< "   "
+                          << te_uiuj(i,3)/npfr-te_u0(i,0)*te_u0(i,1)/(npfr*npfr)<< "   "
+                          << te_uiuj(i,4)/npfr-te_u0(i,0)*te_u0(i,2)/(npfr*npfr)<< "   "
+                          << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;        
+            }   
+        }        
+         
         if (fdproj)
         {
             
@@ -1627,20 +1640,6 @@ int main(int argc, char **argv)
                 (*opca)<<Q(3*j,i)<<"  "<<Q(3*j+1,i)<<"  "<<Q(3*j+2,i)<<std::endl;
         }*/
         }
-    }
-    
-    if (fthermal)
-    {
-        (*otherm) <<"Thermal ellipsoids: Uxx Uyy Uzz Uxy Uxz Uyz\n";
-        for (int i=0; i<te_u0.rows(); i++)
-        {
-             (*otherm)<< te_uiuj(i,0)/npfr-te_u0(i,0)*te_u0(i,0)/(npfr*npfr)<< "   "
-                      << te_uiuj(i,1)/npfr-te_u0(i,1)*te_u0(i,1)/(npfr*npfr)<< "   "
-                      << te_uiuj(i,2)/npfr-te_u0(i,2)*te_u0(i,2)/(npfr*npfr)<< "   "
-                      << te_uiuj(i,3)/npfr-te_u0(i,0)*te_u0(i,1)/(npfr*npfr)<< "   "
-                      << te_uiuj(i,4)/npfr-te_u0(i,0)*te_u0(i,2)/(npfr*npfr)<< "   "
-                      << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;        
-        }   
-    }
+    }   
     return 0;
 }
