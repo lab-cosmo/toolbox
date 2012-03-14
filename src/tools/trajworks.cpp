@@ -454,7 +454,7 @@ int main(int argc, char **argv)
             clp.getoption(fdipole,"dpl",false) &&
             clp.getoption(fhelp,"h",false)&&
             //thermal ellipsoids options
-            clp.getoption(fthermal,"-thermal",false)            
+            clp.getoption(fthermal,"thermal",false)            
             ;
 
     
