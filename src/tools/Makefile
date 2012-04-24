@@ -17,7 +17,7 @@ all: $(TOOLS)
            rm -f $@.$$$$
 
 trajworks.o: trajworks.cpp trajworks.d
-	$(CXX) -c  -D__USEREGEX $(CXXFLAGS) -o $@ $< $(LDFLAGS) 
+	$(CXX) -c $(DREGEX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) 
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDS)
@@ -28,4 +28,4 @@ $(TOOLS:%=../../bin/%): ../../bin/%: %.o
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 ../../bin/trajworks: trajworks.o
-	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) -lboost_regex
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) 

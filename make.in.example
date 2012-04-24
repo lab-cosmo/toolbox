@@ -19,4 +19,6 @@ MAKEDEPEND=g++ -M $(CXXFLAGS)
 
 # Linker flags
 
-LDFLAGS=-L../libs -ltoolbox -lfftw3 -llapack
+DREGEX=-D__USEREGEX
+LREGEX=-lboost_regex
+LDFLAGS=-L../libs -ltoolbox -lfftw3 -llapack $(LREGEX)
