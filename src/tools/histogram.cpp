@@ -69,14 +69,14 @@ int main(int argc, char **argv)
    std::cout<<"# Fraction below: "<<below<<std::endl;
    std::cout<<"# Fraction above: "<<above<<std::endl;
 
+   std::cout.precision(12);
+   std::cout.setf(std::ios::scientific);
+   std::cout.width(14);
    if (faverage)
    {
         std::valarray<double> wx, ww, wf, wy;
         HG.get_bins(wx,ww,wf);
         HGY.get_bins(wx,ww,wy);
-        std::cout.precision(12);
-        std::cout.setf(std::ios::scientific);
-        std::cout.width(14);
         double ay=ty/ny;
         for (unsigned int i=0; i<wx.size(); ++i)
             std::cout<<wx[i]<<" "<<wy[i]/wf[i]*ay<<" "<<wf[i]<<" "<<ww[i]<<"\n";
