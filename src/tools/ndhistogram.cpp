@@ -124,7 +124,6 @@ int main(int argc, char **argv)
     
     std::valarray<double> val(ndim); double weight, y, ty, ny;;
     
-    if (fweighted)
     while (std::cin.good()) { 
          for (int i=0; i<ndim; ++i) std::cin>>val[i]; 
 
