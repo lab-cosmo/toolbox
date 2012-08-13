@@ -784,7 +784,7 @@ void para_temp (
     RndGaussian<double,RNG> grngen(rngen());
     
     //initialize replica temperatures
-    double c1, c2;
+    double c1, c2, c3, c4;
 
     /* we compute "smart" running averages with exponentially decaying memory: let f=exp(-dt/tau_m)
       then at each time step tot<--f*tot+y   n<--f*n+1 so after T steps, we will have
@@ -822,12 +822,12 @@ void para_temp (
 //      pos[1][i]=pos[0][i];
 //    }
 
-
+    double vx=0.0, vy=0.0; 
     for (unsigned long ir=0; ir<nr; ++ir) 
     { 
        c2=sqrt(temp[ir]);  
        for (unsigned long i=0; i<nv; ++i) vel[ir][i]=c2*rngen(); 
-       double vx=0.0, vy=0.0; for (unsigned long i=0; i<nv; i+=2) {vx+=vel[ir][i]; vy+=vel[ir][i+1]; }
+       vx=vy=0.0; for (unsigned long i=0; i<nv; i+=2) {vx+=vel[ir][i]; vy+=vel[ir][i+1]; }
        vx*=2.0/nv;  vy*=2.0/nv; for (unsigned long i=0; i<nv; i+=2) {vel[ir][i]-=vx; vel[ir][i+1]-=vy; }
 
        f.set_vars(pos[ir]);
@@ -848,6 +848,7 @@ void para_temp (
         {
             // does one MD step ( no trotter splitting, since we don't really care that much about the MD )
             c1=exp(-0.5*po.dt/po.tau), c2=sqrt(temp[ir]*(1.0-c1*c1)); 
+            c3=ts, c4=sqrt(temp[ir]*(1.0-c3*c3)); 
             
             kin[ir]=0.0;  for (unsigned long i=0; i<nv; ++i) kin[ir]+=vel[ir][i]*vel[ir][i]; kin[ir]*=0.5;
             cns[ir]+=kin[ir];            
@@ -858,6 +859,12 @@ void para_temp (
             kin[ir]=0.0;  for (unsigned long i=0; i<nv; ++i) kin[ir]+=vel[ir][i]*vel[ir][i]; // project on the old velocity direction
             vel[ir]=vdir*sqrt(kin[ir]); kin[ir]*=0.5;
             cns[ir]-=kin[ir];            
+            //AND ALSO A BIT OF WN LANGEVIN...
+            cns[ir]+=kin[ir];
+            vel[ir]*=c3;  for (unsigned long i=0; i<nv; ++i) vel[ir][i]+=c4*grngen();  //white noise step            
+            vx=vy=0.0; for (unsigned long i=0; i<nv; i+=2) {vx+=vel[ir][i]; vy+=vel[ir][i+1]; }
+            vx*=2.0/nv;  vy*=2.0/nv; for (unsigned long i=0; i<nv; i+=2) {vel[ir][i]-=vx; vel[ir][i+1]-=vy; } // followed by com removal
+            cns[ir]-=kin[ir];
 
             vel[ir]+=grad[ir]*(1.0+wtedv)*(-po.dt*0.5);
             pos[ir]+=vel[ir]*po.dt;
@@ -870,7 +877,7 @@ void para_temp (
             //also evaluate wte[ir](nrg[ir-1])
             if (ir>1) for (unsigned long i=0; i<wte_heights[ir].size(); ++i) 
             {  dwte=(nrg[ir-1]-wte_history[ir][i])/wte_widths[ir][i]; dwte=exp(-dwte*dwte)*wte_heights[ir][i];  wtev+=dwte;  }            
-            wte_up[ir-1]=wtev;
+            if (ir>1) wte_up[ir-1]=wtev;
             //also evaluate wte[ir-1](nrg[ir])
             wtev=0.0;
             if (ir>1) for (unsigned long i=0; i<wte_heights[ir-1].size(); ++i) 
@@ -994,21 +1001,26 @@ void para_temp (
          }
 
         ptmd<<std::endl;        ptreplica<<std::endl;
-        if (is%10==0) {
+        if (is%100==0) {
          std::cerr<<"printing snapshots\n";
-         lowr.open("lowr.dat"); lowr.precision(12);
-         for (unsigned long i=0; i<nv; ++i) {lowr<<std::setw(10)<<pos[0][i]<<"  "; if (i%2==1) lowr<<std::endl;}
-         lowr.close();
-         highr.open("highr.dat"); highr.precision(12);
-         for (unsigned long i=0; i<nv; ++i) {highr<<std::setw(10)<<pos[nr-1][i]<<"  "; if (i%2==1) highr<<std::endl;}
-         highr.close();        
+         for (unsigned long ir=0; ir<nr; ir++)
+         {
+            lowr.open((std::string("replica")+int2str(ir)+std::string(".dat")).c_str()); lowr.precision(12);
+            for (unsigned long i=0; i<nv; ++i) {lowr<<std::setw(10)<<pos[ir][i]<<"  "; if (i%2==1) lowr<<std::endl;}
+            lowr.close();            
+         }
+//         highr.open("highr.dat"); highr.precision(12);
+//         for (unsigned long i=0; i<nv; ++i) {highr<<std::setw(10)<<pos[nr-1][i]<<"  "; if (i%2==1) highr<<std::endl;}
+//         highr.close();        
         }
         
         temp*=ts;
     }
     rpos=pmin;
+    std::cerr<<"done & returning\n";    
     f.set_vars(pmin);   //reset status to minimum position
     f.get_value(rvalue);
+    std::cerr<<"done & returning (again)\n";        
 }
 
 template<class FCLASS>
