@@ -3,7 +3,7 @@
 SOURCES=$(shell ls *.cpp)
 OBJECTS=$(SOURCES:.cpp=.o)
 DEPENDS=$(SOURCES:.cpp=.d)
-TOOLS=autocorr crosscorr gaussmix histogram ndhistogram trajworks
+TOOLS=autocorr crosscorr gaussmix histogram ndhistogram trajworks fourier
 .PHONY: all clean $(TOOLS)
 
 CXXFLAGS:=$(CXXFLAGS) -I../libs
