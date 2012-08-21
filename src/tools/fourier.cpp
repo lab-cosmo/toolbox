@@ -17,7 +17,7 @@ void banner()
             << " -dt [dt]    sets the time interval between input samples. {def: 1.0}           \n"
             << " -pad [npad] appends npad zeroes before doing the FT. increases the resolution. \n"
             << " -win [wnd]  applies a windowing function to the data before FT.                \n"
-            << "             possible values: triangle | cosine | hanning                       \n"
+            << "             possible values: triangle | cosine | hanning | gauss-[2,3,4,5,6]   \n"
             << "                                                                                \n";
 }
 
@@ -50,6 +50,16 @@ int main(int argc, char ** argv)
       for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=cos(0.5*constant::pi*double(i)/double(ndata-1));   
    else if (wnd=="hanning")
       for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=0.5*(1.0+cos(constant::pi*double(i)/double(ndata-1)));   
+   else if (wnd=="gauss-2")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/2.0),2));   
+   else if (wnd=="gauss-3")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/3.0),2));   
+   else if (wnd=="gauss-4")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/4.0),2));         
+   else if (wnd=="gauss-5")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/5.0),2));         
+   else if (wnd=="gauss-6")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/6.0),2));         
    else if (wnd!="") ERROR("Window function "<< wnd << " mispelled or not implemented.");
    // FFTW calls
    fftw_plan r2rplan=fftw_plan_r2r_1d(nfft, &vvt[0], &vvw[0], FFTW_REDFT00, FFTW_ESTIMATE);
