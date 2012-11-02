@@ -224,29 +224,42 @@ namespace toolbox {
                 break;
             case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
                 double hw;
+                // if the point is outside it is completely discarded
+                if (nel<opts.boundaries[0]) {below+=weight; break; }
+                if (nel>opts.boundaries[bs]) {above+=weight; break; }
+
+                // integrate below nel
                 hw=nel-opts.boundaries[0];
                 if (hw>opts.window_width) hw=opts.window_width;
-                if (hw<0) below+=1;
-                else if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
-                else for (ia=ib-1; ia>=0; --ia)
+
+                if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
+                else
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
-                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                    if (nb==0) break; else bins[ia]+=nb*weight;
+                    for (ia=ib-1; ia>=0; --ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    bins[ib]+=wf((opts.boundaries[ib]-nel)/hw,0)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
                 }
-                bins[ib]+=wf((opts.boundaries[ib]-nel)/hw,0)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
+
+                // integrate above nel
                 hw=opts.boundaries[bs]-nel;
                 if (hw>opts.window_width) hw=opts.window_width;
-                bins[ib]+=wf(0,(opts.boundaries[ib+1]-nel)/hw)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
-                if (hw<0) above+=1;
-                else if (hw==0) bins[bs-1]+=0.5*weight/(opts.boundaries[bs]-opts.boundaries[bs-1]);
-                else for (ia=ib+1; ia<bs; ++ia)
+
+                if (hw==0) bins[bs-1]+=0.5*weight/(opts.boundaries[bs]-opts.boundaries[bs-1]);
+                else
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
-                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                    //std::cerr<<":"<<nb<<" ? "<<bins[ia]<<" \n";
-                    if (nb==0) break; else bins[ia]+=weight*nb;
+                    for (ia=ib+1; ia<bs; ++ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=weight*nb;
+                    }
+                    bins[ib]+=wf(0,(opts.boundaries[ib+1]-nel)/hw)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
                 }
+
                 break;
             }
         }
@@ -452,25 +465,39 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
 
             case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
                 double hw;
+
+                // if point is outside, discards it completely
+                if (nel[i]<opts[i].boundaries[0]) break;
+                if (nel[i]>opts[i].boundaries[nbin[i]]) break;
+
                 hw=nel[i]-opts[i].boundaries[0];
                 if (hw>opts[i].window_width) hw=opts[i].window_width;
 
                 if (hw==0) tbins[i][0]+=0.5;
-                else if (hw>0) for (ia=p[i]-1; ia>=0; --ia)
+                else
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
-                    if (nb==0) break; else tbins[i][ia]+=nb;
+                    for (ia=p[i]-1; ia>=0; --ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    tbins[i][p[i]]+=wf((opts[i].boundaries[p[i]]-nel[i])/hw,0);
                 }
-                tbins[i][p[i]]+=wf((opts[i].boundaries[p[i]]-nel[i])/hw,0);
+
                 hw=opts[i].boundaries[nbin[i]]-nel[i];
                 if (hw>opts[i].window_width) hw=opts[i].window_width;
-                tbins[i][p[i]]+=wf(0,(opts[i].boundaries[p[i]+1]-nel[i])/hw);
+
                 if (hw==0) tbins[i][nbin[i]-1]+=0.5;
-                else if (hw>0) for (ia=p[i]+1; ia<nbin[i]; ++ia)
+                else
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
-                    if (nb==0) break; else tbins[i][ia]+=nb;
+                    for (ia=p[i]+1; ia<nbin[i]; ++ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    tbins[i][p[i]]+=wf(0,(opts[i].boundaries[p[i]+1]-nel[i])/hw);
                 }
+
                 break;
             }
         }
