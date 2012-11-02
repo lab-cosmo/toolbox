@@ -96,11 +96,12 @@ int main(int argc, char **argv)
         }
     }
     double mean=AC.mean(), sigma=AC.sigma(), tau=AC.actime();
-    std::cout.precision(6);
-    std::cout<<(fshort?"":"#")<<std::setw(12)<<mean<<" "
-            <<std::setw(12)<<sigma<<" "
-            <<std::setw(12)<<tau<<" "
-            <<std::setw(12)<<AC.actime2()<<"\n";
+    std::cout.precision(8); std::cout.setf(std::ios::scientific); 
+    std::cout<<(fshort?"":"#")
+            <<std::setw(15)<<mean<<" "
+            <<std::setw(15)<<sigma<<" "
+            <<std::setw(15)<<tau<<" "
+            <<std::setw(15)<<AC.actime2()<<"\n";
     if (fshort) return 0;
     std::cout<<"# ^  mean  ^ . ^  sigma ^ . ^   tau  ^ . ^  tau2  ^ .                              \n";
     std::cout.precision(5);

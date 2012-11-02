@@ -791,7 +791,8 @@ void para_temp (
       tot=sum_i<T y_i exp(-dt*i/tau_m) ; n=sum_i<T exp(-dt*i/tau_m) 
       and tot/n will yield a sort of running average of the quantity y
     */
-    std::valarray<double> totv(0.0,nr), totv2(0.0,nr);  double totn=0.0, totf=exp(-po.dt/po.tau_avg);
+    std::valarray<double> totv(0.0,nr), totv2(0.0,nr);  double totn=0.0, totf;
+    totf=std::exp(-1.0*po.dt/po.tau_avg);
  
 //    temp[0]=po.temp_init; for (unsigned long i=1; i<nr; ++i) temp[i]=temp[i-1]*po.temp_factor;
     temp[0]=po.temp_init; for (unsigned long i=1; i<nr; ++i) temp[i]=temp[i-1]*(1+po.temp_factor/sqrt(nv));
@@ -847,7 +848,7 @@ void para_temp (
         for (unsigned long ir=0; ir<nr; ++ir)
         {
             // does one MD step ( no trotter splitting, since we don't really care that much about the MD )
-            c1=exp(-0.5*po.dt/po.tau), c2=sqrt(temp[ir]*(1.0-c1*c1)); 
+            c1=std::exp(-0.5*po.dt/po.tau), c2=sqrt(temp[ir]*(1.0-c1*c1)); 
             c3=ts, c4=sqrt(temp[ir]*(1.0-c3*c3)); 
             
             kin[ir]=0.0;  for (unsigned long i=0; i<nv; ++i) kin[ir]+=vel[ir][i]*vel[ir][i]; kin[ir]*=0.5;
@@ -876,18 +877,18 @@ void para_temp (
             wtev=wtedv=0.0; double dwte;
             //also evaluate wte[ir](nrg[ir-1])
             if (ir>1) for (unsigned long i=0; i<wte_heights[ir].size(); ++i) 
-            {  dwte=(nrg[ir-1]-wte_history[ir][i])/wte_widths[ir][i]; dwte=exp(-dwte*dwte)*wte_heights[ir][i];  wtev+=dwte;  }            
+            {  dwte=(nrg[ir-1]-wte_history[ir][i])/wte_widths[ir][i]; dwte=std::exp(-dwte*dwte)*wte_heights[ir][i];  wtev+=dwte;  }            
             if (ir>1) wte_up[ir-1]=wtev;
             //also evaluate wte[ir-1](nrg[ir])
             wtev=0.0;
             if (ir>1) for (unsigned long i=0; i<wte_heights[ir-1].size(); ++i) 
-            {  dwte=(nrg[ir]-wte_history[ir-1][i])/wte_widths[ir-1][i]; dwte=exp(-dwte*dwte)*wte_heights[ir-1][i];  wtev+=dwte;  }            
+            {  dwte=(nrg[ir]-wte_history[ir-1][i])/wte_widths[ir-1][i]; dwte=std::exp(-dwte*dwte)*wte_heights[ir-1][i];  wtev+=dwte;  }            
             wte_dw[ir]=wtev;
 
             wtev=0.0;
             for (unsigned long i=0; i<wte_heights[ir].size(); ++i) 
             {   
-               dwte=(nrg[ir]-wte_history[ir][i])/wte_widths[ir][i]; dwte=exp(-dwte*dwte)*wte_heights[ir][i]; 
+               dwte=(nrg[ir]-wte_history[ir][i])/wte_widths[ir][i]; dwte=std::exp(-dwte*dwte)*wte_heights[ir][i]; 
                wtev+=dwte; wtedv+=dwte*(-2.0)*(nrg[ir]-wte_history[ir][i])/(wte_widths[ir][i]*wte_widths[ir][i]);
                wte_heights[ir][i]*=ts;  //must scale down hills, because we are also annealing!
             }            
@@ -942,7 +943,7 @@ void para_temp (
                               (wte[ir]-wte_dw[ir+1])/nrg[ir] +
                               (wte[ir+1]-wte_up[ir])/nrg[ir+1];
                std::cerr<<ir<<" "<<deltah<<std::endl;
-               if (rngen()<exp(deltah)   )  
+               if (rngen()<std::exp(deltah)   )  
                { 
                   std::cerr<<"Swapping replicas "<<ir<<" and " <<ir+1<<std::endl;
                   pswp=pos[ir];  pos[ir]=pos[ir+1];   pos[ir+1]=pswp;
@@ -971,7 +972,7 @@ void para_temp (
                if (minv>nrg[ir]) minv=nrg[ir];               if (maxv<nrg[ir]) maxv=nrg[ir];
                std::cerr<<"ADDING NEW HILL, nrg: "<<nrg[ir]<<" temp "<<temp[ir]<<" gamma "<<wte_gamma[ir]<<"\n"; 
                wte_history[ir].push_back(nrg[ir]); 
-               wte_heights[ir].push_back(temp[ir]*0.5*exp(-wte[ir]/(temp[ir]*(wte_gamma[ir]-1))));
+               wte_heights[ir].push_back(temp[ir]*0.5*std::exp(-wte[ir]/(temp[ir]*(wte_gamma[ir]-1))));
                wte_widths[ir].push_back(0.5*sqrt(totv2[ir]/totn-(totv[ir]/totn)*(totv[ir]/totn)) );
                std::cerr<<" new height: "<<wte_heights[ir][wte_heights[ir].size()-1]
                         << "  new width: "<<wte_widths[ir][wte_heights[ir].size()-1]<<"\n";
@@ -992,7 +993,7 @@ void para_temp (
                 for (unsigned long ir=0; ir<nr; ++ir) 
                 { wtev=0.0;
                   for (unsigned long i=0; i<wte_heights[ir].size(); ++i) 
-                 {  dwte=(x-wte_history[ir][i])/wte_widths[ir][i]; dwte=exp(-dwte*dwte)*wte_heights[ir][i];  wtev+=dwte;  }  
+                 {  dwte=(x-wte_history[ir][i])/wte_widths[ir][i]; dwte=std::exp(-dwte*dwte)*wte_heights[ir][i];  wtev+=dwte;  }  
                  lowr<<std::setw(10)<<wtev<<" ";
                  }
                   lowr<<std::endl;
