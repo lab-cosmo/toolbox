@@ -1226,7 +1226,7 @@ int main(int argc, char **argv)
         vvt=0.; vvw=0.;
         for (unsigned long it=0; it<vvlag; ++it)
         {
-            for (unsigned long i=0; i<vvnat; ++i) 
+            for (unsigned long i=0; i<vvnat; ++i) if (vvacf[3*i].sigma()>0.0) 
                 vvt[it]+=vvacf[3*i][it]*vvacf[3*i].sigma()*vvacf[3*i].sigma()
                         +vvacf[3*i+1][it]*vvacf[3*i+1].sigma()*vvacf[3*i+1].sigma()
                         +vvacf[3*i+2][it]*vvacf[3*i+2].sigma()*vvacf[3*i+2].sigma();
