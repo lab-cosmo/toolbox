@@ -5,3 +5,4 @@ bin/*
 *.d
 *.a
 make.in
+*~

@@ -1,7 +1,7 @@
 /* A library to compute histograms in one and many dimensions
    --------------------------------------------------
    Author: Michele Ceriotti, 2008
-   Distributed under the GNU General Public License  
+   Distributed under the GNU General Public License
 */
 
 #ifndef __TOOLS_HISTOGRAM_H
@@ -13,30 +13,37 @@
 namespace toolbox {
     template <class U> class Histogram;
     template <class U> class HGOptions;
-    
+
     enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle};
+    enum HGBoundaryMode {HGBNormal,  HGBHard, HGBPeriodic };
+
+
     template <class U> class HGOptions<Histogram<U> > {
     public:
-        HGWindowMode window;
+        HGWindowMode window; HGBoundaryMode walls;
+
         U window_width;
+
         double (*window_function)(const U& a, const U& b);
         std::valarray<U> boundaries;
-        
-        HGOptions(const HGWindowMode& nwindow=HGWDelta, const U nwindow_width=(U)0., const std::valarray<U>& nbnd=std::valarray<U>(0)) :
-            window(nwindow), window_width(nwindow_width) { boundaries.resize(nbnd.size()); boundaries=nbnd; }
-        HGOptions(const HGOptions& hgo) : window(hgo.window), window_width(hgo.window_width),
+
+
+        HGOptions(const HGWindowMode& nwindow=HGWDelta, const U nwindow_width=(U)0., const std::valarray<U>& nbnd=std::valarray<U>(0), const HGBoundaryMode& nwalls=HGBNormal) :
+            window(nwindow), window_width(nwindow_width), walls(nwalls) { boundaries.resize(nbnd.size()); boundaries=nbnd; }
+        HGOptions(const HGOptions& hgo) : walls(hgo.walls), window(hgo.window), window_width(hgo.window_width),
                   window_function(hgo.window_function), boundaries(hgo.boundaries) {}
-        HGOptions& operator=(const HGOptions& hgo) 
+        HGOptions& operator=(const HGOptions& hgo)
         {
             if (&hgo==this) return *this;
             window=hgo.window;
+            walls=hgo.walls;
             window_width=hgo.window_width;
             window_function=hgo.window_function;
             boundaries.resize(hgo.boundaries.size()); boundaries=hgo.boundaries;
             return *this;
         }
     };
-    
+
     template <class U> class Histogram {
     private:
         std::valarray<double> bins;
@@ -45,23 +52,23 @@ namespace toolbox {
         HGOptions<Histogram<U> > opts;
 
     public:
-        void reset() 
+        void reset()
         {
             bins.resize(opts.boundaries.size()-1);
             bins=0.; ndata=0; above=below=0.;
         }
-        
+
         double samples() { return ndata; }
-        
+
         void get_options(HGOptions<Histogram<U> >& rop)
         { rop=opts; }
-    
+
         void set_options(const HGOptions<Histogram<U> >& rop)
         { opts=rop; reset(); }
-    
+
         Histogram(const HGOptions<Histogram<U> >& rop=HGOptions<Histogram<U> >())
         { set_options(rop); }
-        
+
         Histogram(const U& a, const U&b, unsigned long n, HGWindowMode hgw=HGWDelta, double ww=0.)
         {
             opts.window=hgw; opts.window_width=ww;
@@ -69,15 +76,15 @@ namespace toolbox {
             for (unsigned long i=0; i<=n; ++i) opts.boundaries[i]=a+(b-a)*(1.*i)/n;
             reset();
         }
-        
+
         Histogram(const Histogram<U>& ac) { set_options(ac.opts); }
-        
+
         Histogram<U>& operator=(const Histogram<U>& ac)
         {
             if (&ac==this) return *this;
             set_options(ac.opts);
         }
-        
+
     //copy & assign...
         template<class T> Histogram(const Histogram<T>& ac);
         template<class T> Histogram<U>& operator=(const Histogram<T>& ac);
@@ -87,13 +94,13 @@ namespace toolbox {
     //syntactic sugar to insert a new element into the series, to move to next or previous series
         inline void operator << (const U& nel) { add(nel); }
         inline void operator << (const std::valarray<U>& nseries) { for (unsigned long i=0; i<nseries.size(); ++i) add(nseries[i]); }
-    
+
         void get_bins(std::valarray<double>& rbins) const
         {
             rbins.resize(bins.size());
             rbins=bins*(1./ndata);
         }
-        
+
         void get_bins(std::valarray<U>& cent, std::valarray<U>& ws, std::valarray<double>& rbins) const
         {
             rbins.resize(bins.size()); cent.resize(bins.size()); ws.resize(bins.size());
@@ -104,13 +111,18 @@ namespace toolbox {
                 ws[i]=(opts.boundaries[i+1]-opts.boundaries[i]);
             }
         }
-        
+
         void get_outliers(double& rabove, double& rbelow) const
         {
             rabove=above/ndata; rbelow=below/ndata;
         }
+
+        double get_totweight() const
+        {
+            return ndata;
+        }
     };
-                
+
     template<class U>
     std::ostream& operator<<(std::ostream& os, const Histogram<U>& his)
     {
@@ -123,29 +135,29 @@ namespace toolbox {
             os<<wx[i]<<" "<<wf[i]<<" "<<ww[i]<<"\n";
         return os;
     }
-    
+
     template<class U>
     double __hgwfbox(const U& a, const U& b)
     {
         //std::cerr<<a<<","<<b;
         if (b<=-0.5 || a >=0.5) return 0.;
-        
+
         U ia, ib;
         ia=(a>-0.5?a:-0.5);
         ib=(b< 0.5?b:0.5);
         return ib-ia;
     }
-    
+
     template<class U>
     double __hgwftri(const U& a, const U& b)
     {
         //std::cerr<<a<<","<<b;
         if (b<=-1. || a >=1.) return 0.;
-        
+
         U ia, ib;
         ia=(a>-1.?a:-1.);
         ib=(b< 1.?b:1.);
-        
+
         return (ib*(2.-fabs(ib))-ia*(2.-fabs(ia)))*0.5;
     }
 
@@ -169,7 +181,7 @@ namespace toolbox {
         switch(opts.window)
         {
         case HGWDelta:
-            if (ib==0) 
+            if (ib==0)
             {
                 if (nel>=opts.boundaries[0]) bins[0]+=weight/(opts.boundaries[1]-opts.boundaries[0]);
                 else below+=weight;
@@ -186,33 +198,74 @@ namespace toolbox {
         default:
             ERROR("Windowing mode not implemented yet!\n");
         }
-        if (opts.window!=HGWDelta) 
+        if (opts.window!=HGWDelta)
         {
             double nb=0.;
-            for (ia=ib-1; ia>=0; --ia)
+            switch(opts.walls)
             {
-                nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
-                        /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                //std::cerr<<":"<<nb<<" ? "<<bins[ia]<<" \n";
-                if (nb==0) break; else bins[ia]+=nb*weight;
-            }
-            if (ia<0) {
-                below+=weight*wf(-std::numeric_limits<U>::max(),(opts.boundaries[0]-nel)/opts.window_width);
-            }
-            for (ia=ib; ia<bs; ++ia)
-            {
-                nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
-                        /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                //std::cerr<<":"<<nb<<" ? "<<bins[ia]<<" \n";
-                if (nb==0) break; else bins[ia]+=weight*nb;
-            }
-            if (ia==bs) {
-                above+=weight*wf((opts.boundaries[bs]-nel)/opts.window_width,std::numeric_limits<U>::max());
+            case HGBNormal: // Normal walls, density will spill out
+                //adds weights for bins smaller than ib
+                for (ia=ib-1; ia>=0; --ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=nb*weight;
+                }
+                if (ia<0)
+                    below+=weight*wf(-std::numeric_limits<U>::max(),(opts.boundaries[0]-nel)/opts.window_width);
+                for (ia=ib; ia<bs; ++ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=weight*nb;
+                }
+                if (ia==bs)
+                    above+=weight*wf((opts.boundaries[bs]-nel)/opts.window_width,std::numeric_limits<U>::max());
+                break;
+            case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
+                double hw;
+                // if the point is outside it is completely discarded
+                if (nel<opts.boundaries[0]) {below+=weight; break; }
+                if (nel>opts.boundaries[bs]) {above+=weight; break; }
+
+                // integrate below nel
+                hw=nel-opts.boundaries[0];
+                if (hw>opts.window_width) hw=opts.window_width;
+
+                if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
+                else
+                {
+                    for (ia=ib-1; ia>=0; --ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    bins[ib]+=wf((opts.boundaries[ib]-nel)/hw,0)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
+                }
+
+                // integrate above nel
+                hw=opts.boundaries[bs]-nel;
+                if (hw>opts.window_width) hw=opts.window_width;
+
+                if (hw==0) bins[bs-1]+=0.5*weight/(opts.boundaries[bs]-opts.boundaries[bs-1]);
+                else
+                {
+                    for (ia=ib+1; ia<bs; ++ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-nel)/hw,(opts.boundaries[ia+1]-nel)/hw)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=weight*nb;
+                    }
+                    bins[ib]+=wf(0,(opts.boundaries[ib+1]-nel)/hw)/(opts.boundaries[ib+1]-opts.boundaries[ib])*weight;
+                }
+
+                break;
             }
         }
         ndata+=weight;
     }
-    
+
 /***********************************************************
  *             N-DIMENSIONAL HISTOGRAM                     *
  ***********************************************************/
@@ -225,7 +278,7 @@ private:
     double outliers;
     double ndata;
     std::valarray<HGOptions<Histogram<U> > > opts;
-    long c2b(const std::valarray<long>& vl) 
+    long c2b(const std::valarray<long>& vl)
     {
         long ts=1,rp=0;
         for (int i=0; i<dim;++i)
@@ -234,17 +287,17 @@ private:
     }
 
 public:
-    void reset() 
+    void reset()
     {
         long tsz=1; nbin.resize(dim);
         for (int i=0; i<dim; ++i) tsz*=(nbin[i]=(opts[i].boundaries.size()-1));
         if (tsz<0) tsz=0;
-        
-        bins.resize(tsz); 
+
+        bins.resize(tsz);
         bins=0.; ndata=0; outliers=0.;
-        
+
         std::valarray<long> cp(dim); cp=0;
-        long k=0; vols.resize(tsz); 
+        long k=0; vols.resize(tsz);
         while (cp[dim-1]<nbin[dim-1])
         {
             vols[k]=1.;
@@ -273,11 +326,11 @@ public:
 
 //syntactic sugar to insert a new element into the series, to move to next or previous series
     inline void operator << (const std::valarray<U>& nel) { add(nel); }
-    
+
     double max() const { return bins.max()/ndata; }
     double min() const { return bins.min()/ndata; }
-    
-    
+
+
     void get_bins(std::valarray<double>& rbins) const
     {
         rbins.resize(bins.size());
@@ -298,18 +351,23 @@ public:
             }
         }
     }
-    
+
     void get_bin(const std::valarray<long>& index, std::valarray<double>& center, double& val)
     {
         long ibin=c2b(index);
         center.resize(dim); val=bins[ibin]*(1./ndata);
-        for (unsigned long i=0; i<dim;++i) 
+        for (unsigned long i=0; i<dim;++i)
             center[i]=(opts[i].boundaries[index[i]]+opts[i].boundaries[index[i]+1])/2.;
     }
-    
+
     void get_outliers(double& routliers) const
     {
-        routliers=outliers/ndata; 
+        routliers=outliers/ndata;
+    }
+
+    double get_totweight() const
+    {
+        return ndata;
     }
 };
 
@@ -322,7 +380,7 @@ std::ostream& operator<<(std::ostream& os, const NDHistogram<U>& his)
     os.precision(12);
     os.setf(std::ios::scientific);
     os.width(14);
-    
+
     U outliers; his.get_outliers(outliers);
     os<<"# Fraction of outliers: "<<outliers<<"\n";
     for (unsigned int i=0; i<wx.size(); ++i)
@@ -333,7 +391,7 @@ std::ostream& operator<<(std::ostream& os, const NDHistogram<U>& his)
         for (unsigned int j=0; j<ww[i].size(); ++j) os<<ww[i][j]<<" ";
         os<<"\n";
     }
-    
+
     for (unsigned int i=0; i<wf.size(); ++i)
         os<<wf[i]<<"\n";
     return os;
@@ -361,16 +419,17 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
         p[i]=ib;
     }
     ndata+=weight;
+
     //now, nel is between boundaries[p[i]] and boundaries[p[i]+1] OR below in each dim
     double (*wf)(const U& a, const U& b);
     std::valarray<std::valarray<double> > tbins(dim);
     int i;
-    for (i=0; i<dim; ++i) 
+    for (i=0; i<dim; ++i)
     {
         tbins[i].resize(nbin[i]); tbins[i]=0.;
         //std::cerr<<"running through dimension "<<i<<":"<<tbins[i].size()<<"\n";
         std::valarray<long> ap(p);
-        /*only delta-function, by now...*/
+
         switch(opts[i].window)
         {
         case HGWDelta:
@@ -386,20 +445,60 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
         default:
             ERROR("Windowing mode not implemented yet!\n");
         }
-        if (opts[i].window!=HGWDelta) 
+        if (opts[i].window!=HGWDelta)
         {
             double nb=0.;
-            for (ia=p[i]-1; ia>=0; --ia)
+            switch(opts[i].walls)
             {
-                nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);///(opts[i].boundaries[ia+1]-opts[i].boundaries[ia]);
-                //std::cerr<<nb<<" ** \n";
-                if (nb==0) break; else tbins[i][ia]+=nb;
-            }
-            for (ia=p[i]; ia<nbin[i]; ++ia)
-            {
-                nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);///(opts[i].boundaries[ia+1]-opts[i].boundaries[ia]);
-                //std::cerr<<nb<<" ** \n";
-                if (nb==0) break; else tbins[i][ia]+=nb;
+            case HGBNormal: // Normal walls, density will spill out
+                for (ia=p[i]-1; ia>=0; --ia)
+                {
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    if (nb==0) break; else tbins[i][ia]+=nb;
+                }
+                for (ia=p[i]; ia<nbin[i]; ++ia)
+                {
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    if (nb==0) break; else tbins[i][ia]+=nb;
+                }
+                break;
+
+            case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
+                double hw;
+
+                // if point is outside, discards it completely
+                if (nel[i]<opts[i].boundaries[0]) break;
+                if (nel[i]>opts[i].boundaries[nbin[i]]) break;
+
+                hw=nel[i]-opts[i].boundaries[0];
+                if (hw>opts[i].window_width) hw=opts[i].window_width;
+
+                if (hw==0) tbins[i][0]+=0.5;
+                else
+                {
+                    for (ia=p[i]-1; ia>=0; --ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    tbins[i][p[i]]+=wf((opts[i].boundaries[p[i]]-nel[i])/hw,0);
+                }
+
+                hw=opts[i].boundaries[nbin[i]]-nel[i];
+                if (hw>opts[i].window_width) hw=opts[i].window_width;
+
+                if (hw==0) tbins[i][nbin[i]-1]+=0.5;
+                else
+                {
+                    for (ia=p[i]+1; ia<nbin[i]; ++ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-nel[i])/hw,(opts[i].boundaries[ia+1]-nel[i])/hw);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    tbins[i][p[i]]+=wf(0,(opts[i].boundaries[p[i]+1]-nel[i])/hw);
+                }
+
+                break;
             }
         }
     }
@@ -421,13 +520,13 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
     while (cp[dim-1]<maxp[dim-1])
     {
         int j;
-        
+
         long k=c2b(cp);
         //for (i=0; i<dim; ++i) std::cerr<<cp[i]<<" ";
         //std::cerr<<std::endl;
         double tv=1.; for (i=0; i<dim; ++i) tv*=tbins[i][cp[i]];
         bins[k]+=tv/vols[k]*weight;
-        outs-=tv;//*vols[k]; 
+        outs-=tv;//*vols[k];
         cp[0]++;
         for (i=0; i<dim-1; ++i) if (cp[i]>=maxp[i]) {cp[i]=minp[i]; ++cp[i+1];}
     }
