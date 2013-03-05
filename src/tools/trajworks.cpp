@@ -1220,7 +1220,6 @@ int main(int argc, char **argv)
     }
     if (fvvac) 
     {
-        std::cerr<<"# PRINTING OUT v-v autocorrelation"<<(fvvacbox?" (triangle windowed) ":"")<<"\n";
 
         std::valarray<double> vvt(vvlag+ftpad), vvw(vvlag+ftpad), vbt(vvlag+ftpad);
         vvt=0.; vvw=0.;
@@ -1233,7 +1232,7 @@ int main(int argc, char **argv)
         }
         vbt=vvt;
         if (fvvacbox) for (unsigned long it=0; it<vvlag; ++it) vbt[it]=vvt[it]*(1.-double(it)/double(vvlag));
-        
+        std::cerr<<"# PRINTING OUT v-v autocorrelation"<<(fvvacbox?" (triangle windowed) ":"")<<"\n"; 
         //we are goood guys, so we also compute the FT of the vvac straight away
         fftw_plan r2rplan=fftw_plan_r2r_1d(vvlag+ftpad, &vbt[0], &vvw[0],
                                            FFTW_REDFT00, FFTW_ESTIMATE);

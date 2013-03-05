@@ -126,8 +126,9 @@ int main(int argc, char **argv)
     NDHistogram<double> HG(hgo);
     NDHistogram<double> HGY(hgo);
 
-    std::valarray<double> val(ndim); double weight, y, ty, ny;;
-
+    std::valarray<double> val(ndim); double weight, y, ty, ny;
+   
+    ty=ny=0.0;
     while (std::cin.good()) {
          for (int i=0; i<ndim; ++i) std::cin>>val[i];
 
