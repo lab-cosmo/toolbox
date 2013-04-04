@@ -374,7 +374,7 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
     
-    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fhelp;
+    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
@@ -450,6 +450,9 @@ int main(int argc, char **argv)
             clp.getoption(fpproj,"pproj",false) &&
             clp.getoption(lppat1,"ppat1",std::string("*")) &&
             clp.getoption(lppat2,"ppat2",std::string("*")) &&
+            //mollified charge options
+            clp.getoption(fcharge,"charge",false) &&
+           // clp.getoption(qsmear,"sigma",(double) 1.0) &&            
             //dipole options
             clp.getoption(fdipole,"dpl",false) &&
             clp.getoption(fhelp,"h",false)&&
@@ -560,13 +563,13 @@ int main(int argc, char **argv)
     FMatrix<double> te_u0, te_uiuj;
     
     //initializes output streams
-    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm;
+    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
     std::cout.precision(8); std::cout.width(15); std::cout.setf(std::ios::scientific);
     
     if (prefix=="")
     {
         //everything goes to stdout
-        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=&std::cout;
+        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=&std::cout;
     }
     else
     { 
@@ -621,6 +624,10 @@ int main(int argc, char **argv)
             }
             if (fdpov) 
                 odpov=new std::ofstream((prefix+std::string(".df3")).c_str(), std::ios_base::binary);
+        }
+        if (fcharge) 
+        {   
+            ocharge=new std::ofstream((prefix+std::string(".charge")).c_str());
         }
         if (fpca) 
         {
@@ -854,6 +861,90 @@ int main(int argc, char **argv)
                 micmat(ICM,didata[0],didata[1],didata[2]);
                 if (ldalign=="") micpbc(1./dfoldx,1./dfoldy,1./dfoldz,didata[0],didata[1],didata[2]);  //if we have aligned, we ALREADY HAVE APPLIED PBC AT THE GOOD MOMENT!
                 ndh<<didata;
+            }
+        }
+        if (fcharge) 
+        {
+            if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
+            if (hgo[0].boundaries.size()==0)
+            {
+                if (!fhavecell) ERROR("You must provide cell size in order to compute density hystogram!");
+                //forces the data read above
+                af.nprops["axx"]=CM(0,0);
+                af.nprops["axy"]=CM(1,0);
+                af.nprops["axz"]=CM(2,0);
+                af.nprops["ayx"]=CM(0,1);
+                af.nprops["ayy"]=CM(1,1);
+                af.nprops["ayz"]=CM(2,1);
+                af.nprops["azx"]=CM(0,2);
+                af.nprops["azy"]=CM(1,2);
+                af.nprops["azz"]=CM(2,2);
+                
+                hgo[0].boundaries.resize(dbinsx+1);
+                hgo[1].boundaries.resize(dbinsy+1);
+                hgo[2].boundaries.resize(dbinsz+1);
+                for (int i=0; i<3; ++i)
+                    hgo[i].window_width=densw/sqrt(CM(0,i)*CM(0,i)+CM(1,i)*CM(1,i)+CM(2,i)*CM(2,i));
+                double va,vb;
+                for (int i=0; i<3; ++i)
+                {
+                    //if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
+                    hgo[i].window=HGWTriangle;
+                    switch(i) 
+                    { 
+                        case 0: va=drangeax; vb=drangebx; break;  
+                        case 1: va=drangeay; vb=drangeby; break;  
+                        case 2: va=drangeaz; vb=drangebz; break;
+                    }
+
+                    for (int k=0; k<hgo[i].boundaries.size();k++)
+                        hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1); 
+                }
+                //extra PBC folding (if the cell represents several unit cells and want density accumulated in a single one
+                hgo[0].boundaries*=(1./dfoldx);
+                hgo[1].boundaries*=(1./dfoldy);
+                hgo[2].boundaries*=(1./dfoldz);
+                ndh.set_options(hgo);
+                
+                if (fref!="") cubefr=reffr; else cubefr=af;    //take reference frame as provided
+                
+                
+                if (ldalign!="")
+                {
+                    //we center the "COM" of labelled atoms  for alignment
+                    AtomData ldcom; double ldnlab;
+                    ldcom.x=ldcom.y=ldcom.z=ldnlab=0.;
+                    
+                    //picks out the atoms for alignment
+                    for (int i=0; i<cubefr.ats.size();++i)  if(chk_sel(cubefr.ats[i].name,ldalign))
+                    { 
+                        ++ldnlab; ldcom.x+=cubefr.ats[i].x; ldcom.y+=cubefr.ats[i].y; ldcom.z+=cubefr.ats[i].z;
+                        al_denssel.push_back(i); 
+                    }
+                    ldcom.x/=ldnlab; ldcom.y/=ldnlab; ldcom.z/=ldnlab; 
+                    
+                    for (int i=0; i<cubefr.ats.size();++i) 
+                    { cubefr.ats[i].x-=ldcom.x;  cubefr.ats[i].y-=ldcom.y;  cubefr.ats[i].z-=ldcom.z; }
+                    
+                    
+                }
+                for (int i=0; i<cubefr.ats.size();++i) 
+                    if(chk_sel(cubefr.ats[i].name,ldens)) denssel.push_back(i);
+                
+            }
+            
+            AtomFrame laf=af;
+            if (ldalign!="")  micalign(cubefr, laf, al_denssel,true);
+            al1.clear();  for (unsigned long i=0; i<denssel.size(); ++i)   al1.push_back(laf.ats[denssel[i]]);
+            std::valarray<double> didata(3);
+            for (unsigned long i=0; i<al1.size(); ++i)
+            {
+                //go to scaled coordinates
+                didata[0]=al1[i].x;  didata[1]=al1[i].y; didata[2]=al1[i].z;
+                micmat(ICM,didata[0],didata[1],didata[2]);
+                if (ldalign=="") micpbc(1./dfoldx,1./dfoldy,1./dfoldz,didata[0],didata[1],didata[2]);  //if we have aligned, we ALREADY HAVE APPLIED PBC AT THE GOOD MOMENT!
+               std::cerr<<densw<<al1[i].name<<(al1[i].name==std::string("O")?-2.0:1.0)<<std::endl;
+                ndh.add(didata, (al1[i].name==std::string("O")?-2.0:1.0));
             }
         }
           
@@ -1270,7 +1361,81 @@ int main(int argc, char **argv)
                        << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;        
          }   
          otherm->flush();
-     }        
+     }
+    if (fcharge)
+    {
+        std::cerr<<"# PRINTING OUT CHARGE density\n";
+        std::valarray<double> nb;
+        double a2b1=(1./BOHR2ANG), a2b2=a2b1*a2b1, a2b3=a2b2*a2b1;
+        double svolume=cvolume*(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz);
+        
+        double xvoxel=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz);
+        double vvoxel=svolume/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz); 
+        
+        //volume of a voxel!
+        ndh.get_bins(nb);  
+        double dfout; ndh.get_outliers(dfout);
+        std::cerr<<ndh.samples()*(1.-dfout)/npfr<<" smpl inside\n"<<dfout<<" outliers\n";
+        std::cerr<<svolume/(ndh.samples()*(1.-dfout)/npfr)<<" vol per at\n";
+        std::cerr<<nb.sum()/nb.size()<<" integral\n"<<nb.size()<<" che oh\n";
+    
+        nb*=ndh.samples()/npfr*xvoxel/(vvoxel*a2b3)* (svolume*a2b3)/(svolume*a2b3);
+        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N 
+        double dmax=nb.max(), dmin=nb.min();
+        
+        //prints out in CUBE format 
+        (*ocharge)<<"# VOXEL VOLUME: (bohr^3) " <<vvoxel*a2b3
+                << " DENSITY (bohr^-3) RANGE : ["<<dmin<< ".."<<dmax
+                << "] AVERAGE: "<<nb.sum()/nb.size()
+                <<"\n# Gaussian CUBE density format\n";
+        //input is in A, but cube is always in bohr
+        FMatrix<double>SCM(CM); SCM*=(1./BOHR2ANG);
+        double cx,cy,cz;
+        cx=(drangeax+(drangebx-drangeax)*0.5/dbinsx)/dfoldx;
+        cy=(drangeay+(drangeby-drangeay)*0.5/dbinsy)/dfoldy;
+        cz=(drangeaz+(drangebz-drangeaz)*0.5/dbinsz)/dfoldz;
+        micmat(SCM,cx,cy,cz);
+        
+        (*ocharge)<<cubefr.ats.size()<<" "<<cx<<" "<<cy<<" "<<cz<<"\n";
+        //remember CM and ICM have x=2 z=0
+        (*ocharge)<<dbinsx<<"  "
+                <<SCM(0,0)*(drangebx-drangeax)/dbinsx/dfoldx<<" "
+                <<SCM(1,0)*(drangebx-drangeax)/dbinsx/dfoldx<<" "
+                <<SCM(2,0)*(drangebx-drangeax)/dbinsx/dfoldx<<"\n";
+        (*ocharge)<<dbinsy<<"  "
+                <<SCM(0,1)*(drangeby-drangeay)/dbinsy/dfoldy<<" "
+                <<SCM(1,1)*(drangeby-drangeay)/dbinsy/dfoldy<<" "
+                <<SCM(2,1)*(drangeby-drangeay)/dbinsy/dfoldy<<"\n";
+        (*ocharge)<<dbinsz<<"  "
+                <<SCM(0,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<" "
+                <<SCM(1,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<" "
+                <<SCM(2,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<"\n";
+        std::map<std::string, int> cubelab; int curlab=1;
+        for (int i=0; i<cubefr.ats.size(); ++i) 
+        {
+            micmat(ICM,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
+            micpbc(1.,1.,1.,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
+            micmat(SCM,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
+            //power of stl::map to number sequentially the species
+            if (cubelab.count(cubefr.ats[i].name)==0) cubelab[cubefr.ats[i].name]=(curlab++);
+            (*ocharge)<<cubelab[cubefr.ats[i].name] << "  0.0  " << cubefr.ats[i].x<<" "<<cubefr.ats[i].y<<" "<<cubefr.ats[i].z<<"\n";
+        }
+
+        int dozstep=dbinsx*dbinsy, doshift;
+        //cube must be written out with z first
+        for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy)
+        {
+            doshift=ix+dbinsx*iy; 
+            for (int iz=0; iz<dbinsz; ++iz)
+            {
+                (*ocharge)<<nb[doshift+iz*dozstep]<<"  "; 
+                if (iz%6==5) { (*ocharge)<<std::endl; }
+            }
+            if (dbinsz%6!=0) (*ocharge)<<std::endl;
+        }
+        (*ocharge)<<std::endl;
+    
+   }         
     if (fdens)
     {
         std::cerr<<"# PRINTING OUT 3d density\n";
