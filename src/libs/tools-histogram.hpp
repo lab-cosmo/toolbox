@@ -8,13 +8,15 @@
 #define __TOOLS_HISTOGRAM_H
 
 #include "tbdefs.hpp"
+#include "math.h"
 #include <vector>
 #include <limits>
+
 namespace toolbox {
     template <class U> class Histogram;
     template <class U> class HGOptions;
 
-    enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle};
+    enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle,  HGWGauss1,  HGWGauss2,  HGWGauss3,   HGWGauss5 };
     enum HGBoundaryMode {HGBNormal,  HGBHard, HGBPeriodic };
 
 
@@ -139,7 +141,6 @@ namespace toolbox {
     template<class U>
     double __hgwfbox(const U& a, const U& b)
     {
-        //std::cerr<<a<<","<<b;
         if (b<=-0.5 || a >=0.5) return 0.;
 
         U ia, ib;
@@ -151,7 +152,6 @@ namespace toolbox {
     template<class U>
     double __hgwftri(const U& a, const U& b)
     {
-        //std::cerr<<a<<","<<b;
         if (b<=-1. || a >=1.) return 0.;
 
         U ia, ib;
@@ -159,6 +159,62 @@ namespace toolbox {
         ib=(b< 1.?b:1.);
 
         return (ib*(2.-fabs(ib))-ia*(2.-fabs(ia)))*0.5;
+    }
+
+#define G1ERF1 5.03149608121118568
+#define G1DY   0.24197072451914334980
+    template<class U>
+    double __hgwfgauss1(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib/constant::sqrt2)-erf(ia/constant::sqrt2)) *0.5 -(ib-ia)*G1DY )*G1ERF1;
+    }
+
+#define G2ERF1 1.354030373543121523
+#define G2DY   0.10798193302637610390
+    template<class U>
+    double __hgwfgauss2(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*2/constant::sqrt2)-erf(ia*2/constant::sqrt2)) *0.5 -(ib-ia)*G2DY )*G2ERF1;
+    }
+
+#define G3ERF1 1.030174731161562310
+#define G3DY   0.01329554523581402153
+    template<class U>
+    double __hgwfgauss3(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*3/constant::sqrt2)-erf(ia*3/constant::sqrt2)) *0.5 -(ib-ia)*G3DY )*G3ERF1;
+    }
+
+#define G5ERF1 1.00001544073670377005281
+#define G5DY   7.43359757367148854e-6
+    template<class U>
+    double __hgwfgauss5(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*5/constant::sqrt2)-erf(ia*5/constant::sqrt2)) *0.5 -(ib-ia)*G5DY )*G5ERF1;
     }
 
     template<class U>
@@ -194,6 +250,18 @@ namespace toolbox {
             break;
         case HGWTriangle:
             wf=__hgwftri;
+            break;
+        case HGWGauss1:
+            wf=__hgwfgauss1;
+            break;
+        case HGWGauss2:
+            wf=__hgwfgauss2;
+            break;
+        case HGWGauss3:
+            wf=__hgwfgauss3;
+            break;
+        case HGWGauss5:
+            wf=__hgwfgauss5;
             break;
         default:
             ERROR("Windowing mode not implemented yet!\n");
@@ -232,6 +300,7 @@ namespace toolbox {
                 hw=nel-opts.boundaries[0];
                 if (hw>opts.window_width) hw=opts.window_width;
 
+                //get the amount of density that would spill out
                 if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
                 else
                 {
@@ -441,6 +510,18 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
             break;
         case HGWTriangle:
             wf=__hgwftri;
+            break;
+        case HGWGauss1:
+            wf=__hgwfgauss1;
+            break;
+        case HGWGauss2:
+            wf=__hgwfgauss2;
+            break;
+        case HGWGauss3:
+            wf=__hgwfgauss3;
+            break;
+        case HGWGauss5:
+            wf=__hgwfgauss5;
             break;
         default:
             ERROR("Windowing mode not implemented yet!\n");

@@ -9,19 +9,19 @@
 #include<fstream>
 //ooops! beware, this requires extensions to STL. should program with conditional compilation
 //#define __USEREGEX 1
-#ifdef __USEREGEX 
+#ifdef __USEREGEX
 //#include <regex>
 #include <boost/regex.hpp>
 using namespace boost;
 bool chk_sel(const std::string& label, const std::string& regex)
-{ 
+{
     boost::regex pattern(regex);
     return regex_match(label,pattern);
 }
-#else 
+#else
 bool chk_sel(const std::string& label, const std::string& regex)
 { return (regex=="*")||(label==regex); }
-#endif 
+#endif
 
 #include "matrix-full.hpp"
 #include "matrix-io.hpp"
@@ -29,14 +29,14 @@ bool chk_sel(const std::string& label, const std::string& regex)
 using namespace toolbox;
 void inline micdo(const double& a, double &d)
 {
-    if (a!=0.) 
+    if (a!=0.)
     {
-        d/=a; 
+        d/=a;
         d-=round(d);
         d*=a;
     }
 }
-void micpbc(const double &ax, const double &ay, const double &az, 
+void micpbc(const double &ax, const double &ay, const double &az,
             double& dx, double& dy, double& dz)
 {
     micdo(ax,dx); micdo(ay,dy); micdo(az,dz);
@@ -54,24 +54,24 @@ void micrmsd(const std::vector<AtomData>& r, const std::vector<AtomData>& p, FMa
 {
     FMatrix<double> D(4,4); D*=0.;
     double q[4],P[6][6],U[6];
-    
+
     for (long at=0; at<r.size(); ++at)
     {
         U[0]=p[at].x+r[at].x; U[1]=p[at].y+r[at].y; U[2]=p[at].z+r[at].z;
         U[3]=r[at].x-p[at].x; U[4]=r[at].y-p[at].y; U[5]=r[at].z-p[at].z;
-    
+
         for (int i=0; i<6; ++i)
         {
             P[i][i]=U[i]*U[i];
             for (int j=0; j<i; ++j)
                 P[i][j]=P[j][i]=U[i]*U[j];
         }
-        
+
         double tp=P[0][0]+P[1][1]+P[2][2];
         double tm=P[3][3]+P[4][4]+P[5][5];
-        D(0,0)+=tm; 
-        D(1,1)+=tp-P[0][0]+P[3][3]; 
-        D(2,2)+=tp-P[1][1]+P[4][4]; 
+        D(0,0)+=tm;
+        D(1,1)+=tp-P[0][0]+P[3][3];
+        D(2,2)+=tp-P[1][1]+P[4][4];
         D(3,3)+=tp-P[2][2]+P[5][5];
         D(0,1)+=P[1][5]-P[2][4];
         D(0,2)+=P[2][3]-P[0][5];
@@ -80,19 +80,19 @@ void micrmsd(const std::vector<AtomData>& r, const std::vector<AtomData>& p, FMa
         D(1,3)+=P[3][5]-P[0][2];
         D(2,3)+=P[4][5]-P[1][2];
     }
-    
+
     D(1,0)=D(0,1);
     D(2,0)=D(0,2);
     D(3,0)=D(0,3);
     D(2,1)=D(1,2);
     D(3,1)=D(1,3);
     D(3,2)=D(2,3);
-    
+
     FMatrix<double> E; std::valarray<double> v;
     EigenSolverSym(D, E, v);
-    
+
     for (int i=0; i<4; ++i) q[i]=E(i,0);
-    
+
     RMAT.resize(3,3);
     RMAT(0,0)=q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3];
     RMAT(1,1)=q[0]*q[0]-q[1]*q[1]+q[2]*q[2]-q[3]*q[3];
@@ -110,10 +110,10 @@ void micalign(const AtomFrame& pr, AtomFrame& p, const std::vector<unsigned long
 {
     FMatrix<double> rmat;
     AtomFrame r=pr;
-    
+
     //Metric matrices
     FMatrix<double> CM(3,3), ICM;
-    if (dopbc) 
+    if (dopbc)
     {
         CM(0,0)=r.nprops["axx"];
         CM(1,0)=r.nprops["axy"];
@@ -126,11 +126,11 @@ void micalign(const AtomFrame& pr, AtomFrame& p, const std::vector<unsigned long
         CM(2,2)=r.nprops["azz"];
         MatrixInverse(CM,ICM);
     }
-    
+
     if (r.ats.size()!=p.ats.size()) ERROR("Atom number in frames mismatches");
     //first, align "COM"
     AtomData rcom, pcom; double nlab;
-    std::vector<AtomData> ral, pal; 
+    std::vector<AtomData> ral, pal;
 
     //first center the reference structure.
     //computes COM
@@ -143,14 +143,14 @@ void micalign(const AtomFrame& pr, AtomFrame& p, const std::vector<unsigned long
         rcom.x+=r.ats[i].x; rcom.y+=r.ats[i].y; rcom.z+=r.ats[i].z;
         pcom.x+=p.ats[i].x; pcom.y+=p.ats[i].y; pcom.z+=p.ats[i].z;
     }
-    
+
     rcom.x/=nlab; rcom.y/=nlab; rcom.z/=nlab;
     pcom.x/=nlab; pcom.y/=nlab; pcom.z/=nlab;
     //center and apply PBC to reference structure
     for (int i=0; i<r.ats.size(); ++i)
     {
         r.ats[i].x-=rcom.x;  r.ats[i].y-=rcom.y;  r.ats[i].z-=rcom.z;
-        if (dopbc) 
+        if (dopbc)
         {
             micmat(ICM,r.ats[i].x,r.ats[i].y,r.ats[i].z);
             micpbc(1.,1.,1.,r.ats[i].x,r.ats[i].y,r.ats[i].z);
@@ -169,12 +169,12 @@ void micalign(const AtomFrame& pr, AtomFrame& p, const std::vector<unsigned long
             micmat(CM,p.ats[i].x,p.ats[i].y,p.ats[i].z);
         }
     }
-    
+
     for (int k=0; k<asel.size(); ++k)
     {
         unsigned long i=asel[k];
         ral.push_back(r.ats[i]);
-        pal.push_back(p.ats[i]); 
+        pal.push_back(p.ats[i]);
     }
 
     micrmsd(ral,pal,rmat);
@@ -203,17 +203,17 @@ void cub_compute_cr(double x, double r, double dr, double h, double&f)
 {
     if (x<=r)
     {
-        f=1.; 
+        f=1.;
     }
     else if (x<(r+dr))
     {
         double y=(x-r)/dr;
         double cr, crh, dcr; cr=y-1.; cr*=cr; cr*=(1.+y+y); crh=pow(cr,h);
-        f=crh; 
-    } 
+        f=crh;
+    }
     else
     {
-        f=0.; 
+        f=0.;
     }
 }
 
@@ -243,54 +243,54 @@ void cub_compute_ca(double rx, double ry, double rz, double r, double& f)
 
 
 // weird numbers are there to normalize so that perfect fcc=1 and isotropic liquid=0
-    f=2288./79.*(rpp12-4./143.); 
+    f=2288./79.*(rpp12-4./143.);
 }
 
 double get_cv(std::vector<AtomData>& al, unsigned long iat, std::vector<double>& pars, const FMatrix<double>& CM, const FMatrix<double>& ICM, unsigned long cvtype)
 {
     int nat=al.size();
     int j;
-    double rx, ry, rz, rij, crij, caij, tca, tcr, tcv; 
+    double rx, ry, rz, rij, crij, caij, tca, tcr, tcv;
     double r1, dr, h, r02;
     switch (cvtype) {
         case 1: // FCC order parameter, aligned to cartesian axes
-        r1 = pars[0]; dr = pars[2]-pars[0]; h = (2.+pow((pars[2]-r1)/(pars[1]-r1),2))/6.; r02=pars[2]*pars[2]; 
+        r1 = pars[0]; dr = pars[2]-pars[0]; h = (2.+pow((pars[2]-r1)/(pars[1]-r1),2))/6.; r02=pars[2]*pars[2];
         tca=tcr=0.;
         for(j=0;j<nat;++j) {
             if (j==iat) continue;
             rx=al[j].x-al[iat].x; ry=al[j].y-al[iat].y; rz=al[j].z-al[iat].z;
-            
+
             micmat(ICM,rx,ry,rz);
             micpbc(1.,1.,1.,rx,ry,rz);
             micmat(CM,rx,ry,rz);
             rij=rx*rx+ry*ry+rz*rz;
-            
+
             if (rij>r02) continue; //Useless to compute angular part if radial=0
             rij=sqrt(rij);
-            cub_compute_cr(rij, r1, dr, h, crij);    
+            cub_compute_cr(rij, r1, dr, h, crij);
             cub_compute_ca(rx, ry, rz, rij, caij);
             tcr+=crij; tca+=caij*crij;
-        } 
-    
+        }
+
         tcv=tca/tcr;
         break;
         case 2: // same-kind coordination number
-            r1 = pars[0]; dr = pars[2]-pars[0]; h = (2.+pow((pars[2]-r1)/(pars[1]-r1),2))/6.; r02=pars[2]*pars[2]; 
+            r1 = pars[0]; dr = pars[2]-pars[0]; h = (2.+pow((pars[2]-r1)/(pars[1]-r1),2))/6.; r02=pars[2]*pars[2];
             tcv=0.;
             for(j=0;j<nat;++j) {
                 if (j==iat) continue;
                 rx=al[j].x-al[iat].x; ry=al[j].y-al[iat].y; rz=al[j].z-al[iat].z;
-            
+
                 micmat(ICM,rx,ry,rz);
                 micpbc(1.,1.,1.,rx,ry,rz);
                 micmat(CM,rx,ry,rz);
                 rij=rx*rx+ry*ry+rz*rz;
-            
+
                 if (rij>r02) continue; //Useless to compute angular part if radial=0
                 rij=sqrt(rij);
-                cub_compute_cr(rij, r1, dr, h, crij);    
+                cub_compute_cr(rij, r1, dr, h, crij);
                 tcv+=crij;
-            } 
+            }
         break;
     }
     return tcv;
@@ -298,7 +298,7 @@ double get_cv(std::vector<AtomData>& al, unsigned long iat, std::vector<double>&
 
 #define BOHR2ANG 0.529177
 
-void banner() 
+void banner()
 {
     std::cerr
             << " USAGE: trajworks  [options] < INPUT [ > OUTPUT ]                               \n"
@@ -373,7 +373,7 @@ void banner()
 int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
-    
+
     bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
@@ -401,7 +401,7 @@ int main(int argc, char **argv)
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
             clp.getoption(gdrbins,"grbins",(unsigned long)100) &&
-            //vvacf options 
+            //vvacf options
             clp.getoption(fvvac,"vvac",false) &&
             clp.getoption(fvvacbox,"vvftbox",false) &&
             clp.getoption(vvindex,"vvindex",std::vector<unsigned long>(0)) &&
@@ -452,41 +452,41 @@ int main(int argc, char **argv)
             clp.getoption(lppat2,"ppat2",std::string("*")) &&
             //mollified charge options
             clp.getoption(fcharge,"charge",false) &&
-           // clp.getoption(qsmear,"sigma",(double) 1.0) &&            
+           // clp.getoption(qsmear,"sigma",(double) 1.0) &&
             //dipole options
             clp.getoption(fdipole,"dpl",false) &&
             clp.getoption(fhelp,"h",false)&&
             //thermal ellipsoids options
-            clp.getoption(fthermal,"thermal",false)            
+            clp.getoption(fthermal,"thermal",false)
             ;
 
-    
+
     if (fhelp || ! fok) { banner(); exit(-1); }
     //general-purpose stuff
-    
+
     HGWindowMode hwin; HGOptions<Histogram<double> > hgwo;
     if (shwin=="triangle") hwin=HGWTriangle;
     else if (shwin=="box") hwin=HGWBox;
     else if (shwin=="delta") hwin=HGWDelta;
     else ERROR("Unsupported histogram windowing mode");
-    
-    
-    AtomFrame af; std::vector<AtomData> al1, al2, ldip; 
+
+
+    AtomFrame af; std::vector<AtomData> al1, al2, ldip;
     AtomData dip_tx, dip_cur; double tcharge=0.;
     Histogram<double> hgdr(0.,cogdr, gdrbins);
-    hgdr.get_options(hgwo); hgwo.window=hwin; 
+    hgdr.get_options(hgwo); hgwo.window=hwin;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hgdr.set_options(hgwo);
-    
+
     double d12, dx, dy, dz, cog2=cogdr*cogdr;
     int nfr=0, npfr=0;
-        
+
     //velocity-velocity correlation stuff
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
-    
+
     //MSD stuff
     unsigned long imsd=0, msdnat=0; std::valarray<unsigned long> nmsd(msdlag); AtomFrame refmsd;
     std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; std::valarray<bool> fmsd_inc;
-    
+
     //density histograms
     std::valarray<HGOptions<Histogram<double> > > hgo(3);
     NDHistogram<double> ndh(hgo);
@@ -502,10 +502,10 @@ int main(int argc, char **argv)
         while (npos!=std::string::npos)
         { sdbins[npos]=' ';  npos=sdbins.find_first_of(',',npos+1);  }
         std::istringstream iss(sdbins);
-        iss>>dbinsx>>dbinsy>>dbinsz; 
+        iss>>dbinsx>>dbinsy>>dbinsz;
         if (iss.fail() || iss.bad()) ERROR("Invalid format for dbins (use either -dbins n or -dbins nx,ny,nz).");
     }
-    
+
     dfoldx=dfoldy=dfoldz=1;
     if (sdfold!="")
     {
@@ -514,7 +514,7 @@ int main(int argc, char **argv)
         while (npos!=std::string::npos)
         { sdfold[npos]=' ';  npos=sdfold.find_first_of(',',npos+1);  }
         std::istringstream iss(sdfold);
-        iss>>dfoldx>>dfoldy>>dfoldz; 
+        iss>>dfoldx>>dfoldy>>dfoldz;
         if (iss.fail() || iss.bad()) ERROR("Invalid format for dfold (use -dfold fx,fy,fz).");
     }
 
@@ -527,27 +527,27 @@ int main(int argc, char **argv)
         while (npos!=std::string::npos)
         { sdrange[npos]=' ';  npos=sdrange.find_first_of(',',npos+1);  }
         std::istringstream iss(sdrange);
-        iss>>drangeax>>drangebx>>drangeay>>drangeby>>drangeaz>>drangebz; 
+        iss>>drangeax>>drangebx>>drangeay>>drangeby>>drangeaz>>drangebz;
         if (iss.fail() || iss.bad()) ERROR("Invalid format for drange (use -drange ax,bx,ay,by,az,bz).");
     }
     //principal component analysis stuff
     FMatrix<double> pcaxx; std::valarray<double> pcax; AtomFrame pcafr;
     unsigned long pcasz;
-    
+
     //momentum distribution stuff
     double npdat=0; std::valarray<bool> fpd_inc;
-    Histogram<double> hpd(0.,pdmax,pdbins); 
-    FMatrix<double> pdtens2(3,3,0.); FMatrix<FMatrix<double> > pdtens4(3,3,FMatrix<double>(3,3,0.)); 
-    
-    if (pdvec.size()!=0) 
-    { 
+    Histogram<double> hpd(0.,pdmax,pdbins);
+    FMatrix<double> pdtens2(3,3,0.); FMatrix<FMatrix<double> > pdtens4(3,3,FMatrix<double>(3,3,0.));
+
+    if (pdvec.size()!=0)
+    {
         if (pdvec.size()!=3) ERROR("Invalid vector given for -pdvec");
-        double pdvnorm=sqrt(pdvec[0]*pdvec[0]+pdvec[1]*pdvec[1]+pdvec[2]*pdvec[2]); 
+        double pdvnorm=sqrt(pdvec[0]*pdvec[0]+pdvec[1]*pdvec[1]+pdvec[2]*pdvec[2]);
         for (int i=0; i<3; ++i) pdvec[i]/=pdvnorm;
     }
-    hpd.get_options(hgwo); hgwo.window=hwin; 
+    hpd.get_options(hgwo); hgwo.window=hwin;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hpd.set_options(hgwo);
-    
+
     //3d momentum distribution stuff
     double np3dat=0; std::valarray<bool> fp3d_inc;
     std::valarray<HGOptions<Histogram<double> > > p3dhgo(3);
@@ -558,98 +558,98 @@ int main(int argc, char **argv)
       for (int k=0; k<p3dbins+1;k++) p3dhgo[i].boundaries[k]=-p3dmax+(2.*k*p3dmax/p3dbins);
     }
     NDHistogram<double> p3dh(p3dhgo);
-    
+
     //thermal ellipsoids stuff
     FMatrix<double> te_u0, te_uiuj;
-    
+
     //initializes output streams
     std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
     std::cout.precision(8); std::cout.width(15); std::cout.setf(std::ios::scientific);
-    
+
     if (prefix=="")
     {
         //everything goes to stdout
         ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=&std::cout;
     }
     else
-    { 
-        if (fgdr) 
+    {
+        if (fgdr)
         {
             ogdr=new std::ofstream((prefix+std::string(".gdr")).c_str());
-            (*ogdr).precision(8); (*ogdr).width(15); (*ogdr).setf(std::ios::scientific); 
+            (*ogdr).precision(8); (*ogdr).width(15); (*ogdr).setf(std::ios::scientific);
         }
-        if (fcv) 
+        if (fcv)
         {
             ocv=new std::ofstream((prefix+std::string(".cv")).c_str());
-            (*ocv).precision(8); (*ocv).width(15); (*ocv).setf(std::ios::scientific); 
+            (*ocv).precision(8); (*ocv).width(15); (*ocv).setf(std::ios::scientific);
         }
-        if (fpd) 
+        if (fpd)
         {
             opd=new std::ofstream((prefix+std::string(".pd")).c_str());
-            (*opd).precision(8); (*opd).width(15); (*opd).setf(std::ios::scientific); 
+            (*opd).precision(8); (*opd).width(15); (*opd).setf(std::ios::scientific);
         }
-        if (fp3d) 
+        if (fp3d)
         {
             op3d=new std::ofstream((prefix+std::string(".p3d")).c_str());
-            (*op3d).precision(8); (*op3d).width(10); (*op3d).setf(std::ios::scientific); 
+            (*op3d).precision(8); (*op3d).width(10); (*op3d).setf(std::ios::scientific);
         }
-        if (fpproj) 
+        if (fpproj)
         {
             opproj=new std::ofstream((prefix+std::string(".pproj")).c_str());
-            (*opproj).precision(8); (*opproj).width(10); (*opproj).setf(std::ios::scientific); 
+            (*opproj).precision(8); (*opproj).width(10); (*opproj).setf(std::ios::scientific);
         }
-        if (fvvac) 
+        if (fvvac)
         {
             ovvac=new std::ofstream((prefix+std::string(".vvac")).c_str());
-            (*ovvac).precision(8); (*ovvac).width(15); (*ovvac).setf(std::ios::scientific); 
+            (*ovvac).precision(8); (*ovvac).width(15); (*ovvac).setf(std::ios::scientific);
         }
-        if (fmsd) 
+        if (fmsd)
         {
             omsd=new std::ofstream((prefix+std::string(".msd")).c_str());
-            (*omsd).precision(8); (*omsd).width(15); (*omsd).setf(std::ios::scientific); 
+            (*omsd).precision(8); (*omsd).width(15); (*omsd).setf(std::ios::scientific);
         }
-        if (fdipole) 
+        if (fdipole)
         {
             odipole=new std::ofstream((prefix+std::string(".dpl")).c_str());
-            (*odipole).precision(8); (*odipole).width(15); (*odipole).setf(std::ios::scientific); 
+            (*odipole).precision(8); (*odipole).width(15); (*odipole).setf(std::ios::scientific);
         }
-        if (fdens) 
-        {   
+        if (fdens)
+        {
             odens=new std::ofstream((prefix+std::string(".dens")).c_str());
-            (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
-            if (fdtraj) 
+            (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
+            if (fdtraj)
             {
                 odtraj=new std::ofstream((prefix+std::string(".dtraj.xyz")).c_str());
-                (*odtraj).precision(8); (*odtraj).width(15); (*odtraj).setf(std::ios::scientific); 
+                (*odtraj).precision(8); (*odtraj).width(15); (*odtraj).setf(std::ios::scientific);
             }
-            if (fdpov) 
+            if (fdpov)
                 odpov=new std::ofstream((prefix+std::string(".df3")).c_str(), std::ios_base::binary);
         }
-        if (fcharge) 
-        {   
+        if (fcharge)
+        {
             ocharge=new std::ofstream((prefix+std::string(".charge")).c_str());
         }
-        if (fpca) 
+        if (fpca)
         {
             opca=new std::ofstream((prefix+std::string(".log")).c_str());
-            (*opca).precision(8); (*opca).width(15); (*opca).setf(std::ios::scientific); 
+            (*opca).precision(8); (*opca).width(15); (*opca).setf(std::ios::scientific);
             if (fpcaxyz)
-            { 
+            {
                 opcaxyz=new std::ofstream((prefix+std::string(".pca.xyz")).c_str());
-                (*opcaxyz).precision(8); (*opcaxyz).width(15); (*opcaxyz).setf(std::ios::scientific); 
+                (*opcaxyz).precision(8); (*opcaxyz).width(15); (*opcaxyz).setf(std::ios::scientific);
             }
         }
-        if (fthermal) 
+        if (fthermal)
         {
             otherm=new std::ofstream((prefix+std::string(".therm")).c_str());
-            (*otherm).precision(8); (*otherm).width(15); (*otherm).setf(std::ios::scientific); 
-        }        
+            (*otherm).precision(8); (*otherm).width(15); (*otherm).setf(std::ios::scientific);
+        }
     }
-    
+
     //someone might need a gaussian prn
     toolbox::RndGaussian<double,toolbox::MTRndUniform> rng(RGPars<double>(0,1));
     rng.RUGenerator().seed(100);
-            
+
     //cell matrix reading
     std::ifstream ifbox;
     FMatrix<double> CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
@@ -657,21 +657,21 @@ int main(int argc, char **argv)
     //named selection
     std::vector<unsigned long> denssel, al_denssel, pcasel, al_pcasel, gdrsel,vvacsel;
     AtomFrame reffr;
-    
+
     std::ifstream iflab; std::vector<std::string > vlab(0);
-    if (flab!="") 
+    if (flab!="")
     {
-        std::string lslab; 
+        std::string lslab;
         iflab.open(flab.c_str());
-        
+
         while((iflab>>lslab).good()) vlab.push_back(lslab);
     }
-    
+
     if(fdlp) { std::getline(std::cin,dummy); std::getline(std::cin,dummy); } //jumps over header
     bool ffirstcell;
     AtomFrame uwframe;
     while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
-    { 
+    {
         ++nfr;
         if (fstop!=0 && nfr>fstop)  break;
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
@@ -695,14 +695,14 @@ int main(int argc, char **argv)
             }
             else if (fdlp) { af2cm(af,CM); }
             else fhavecell=false;
-            if (fhavecell) 
+            if (fhavecell)
             {
                 MatrixInverse(CM,ICM);
-  
+
                 cvolume=fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
                         CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0));
             }
-            
+
             if (fref!="")
             {
                 //reads reference frame from external file
@@ -716,7 +716,7 @@ int main(int argc, char **argv)
             }
         }
         if (fvbox && ! ffirstcell)
-        { 
+        {
             if (fbox!="")
             {
                     //read one more matrix from box file
@@ -728,7 +728,7 @@ int main(int argc, char **argv)
             cvolume=fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
                     CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0));
         }
-        
+
         if (funwrap)
         {
             if (uwframe.ats.size()==0) uwframe=af;
@@ -757,7 +757,7 @@ int main(int argc, char **argv)
             {
                //initializes vectors for average positions and variance
                te_u0.resize(af.ats.size(),3);
-               te_uiuj.resize(af.ats.size(),6);               
+               te_uiuj.resize(af.ats.size(),6);
                te_u0*=0.0; te_uiuj*=0.0;
             }
             for (int i=0; i<af.ats.size(); ++i)
@@ -770,10 +770,10 @@ int main(int argc, char **argv)
                te_uiuj(i,2)+=af.ats[i].z*af.ats[i].z;
                te_uiuj(i,3)+=af.ats[i].x*af.ats[i].y;
                te_uiuj(i,4)+=af.ats[i].x*af.ats[i].z;
-               te_uiuj(i,5)+=af.ats[i].y*af.ats[i].z;               
-            }                    
+               te_uiuj(i,5)+=af.ats[i].y*af.ats[i].z;
+            }
         }
-        if (fdens) 
+        if (fdens)
         {
             if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
             if (hgo[0].boundaries.size()==0)
@@ -789,7 +789,7 @@ int main(int argc, char **argv)
                 af.nprops["azx"]=CM(0,2);
                 af.nprops["azy"]=CM(1,2);
                 af.nprops["azz"]=CM(2,2);
-                
+
                 hgo[0].boundaries.resize(dbinsx+1);
                 hgo[1].boundaries.resize(dbinsy+1);
                 hgo[2].boundaries.resize(dbinsz+1);
@@ -799,49 +799,49 @@ int main(int argc, char **argv)
                 for (int i=0; i<3; ++i)
                 {
                     if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
-                    switch(i) 
-                    { 
-                        case 0: va=drangeax; vb=drangebx; break;  
-                        case 1: va=drangeay; vb=drangeby; break;  
+                    switch(i)
+                    {
+                        case 0: va=drangeax; vb=drangebx; break;
+                        case 1: va=drangeay; vb=drangeby; break;
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
 
                     for (int k=0; k<hgo[i].boundaries.size();k++)
-                        hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1); 
+                        hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1);
                 }
                 //extra PBC folding (if the cell represents several unit cells and want density accumulated in a single one
                 hgo[0].boundaries*=(1./dfoldx);
                 hgo[1].boundaries*=(1./dfoldy);
                 hgo[2].boundaries*=(1./dfoldz);
                 ndh.set_options(hgo);
-                
+
                 if (fref!="") cubefr=reffr; else cubefr=af;    //take reference frame as provided
-                
-                
+
+
                 if (ldalign!="")
                 {
                     //we center the "COM" of labelled atoms  for alignment
                     AtomData ldcom; double ldnlab;
                     ldcom.x=ldcom.y=ldcom.z=ldnlab=0.;
-                    
+
                     //picks out the atoms for alignment
                     for (int i=0; i<cubefr.ats.size();++i)  if(chk_sel(cubefr.ats[i].name,ldalign))
-                    { 
+                    {
                         ++ldnlab; ldcom.x+=cubefr.ats[i].x; ldcom.y+=cubefr.ats[i].y; ldcom.z+=cubefr.ats[i].z;
-                        al_denssel.push_back(i); 
+                        al_denssel.push_back(i);
                     }
-                    ldcom.x/=ldnlab; ldcom.y/=ldnlab; ldcom.z/=ldnlab; 
-                    
-                    for (int i=0; i<cubefr.ats.size();++i) 
+                    ldcom.x/=ldnlab; ldcom.y/=ldnlab; ldcom.z/=ldnlab;
+
+                    for (int i=0; i<cubefr.ats.size();++i)
                     { cubefr.ats[i].x-=ldcom.x;  cubefr.ats[i].y-=ldcom.y;  cubefr.ats[i].z-=ldcom.z; }
-                    
-                    
+
+
                 }
-                for (int i=0; i<cubefr.ats.size();++i) 
+                for (int i=0; i<cubefr.ats.size();++i)
                     if(chk_sel(cubefr.ats[i].name,ldens)) denssel.push_back(i);
-                
+
             }
-            
+
             AtomFrame laf=af;
             if (ldalign!="")  micalign(cubefr, laf, al_denssel,true);
             if (fdtraj)
@@ -863,7 +863,7 @@ int main(int argc, char **argv)
                 ndh<<didata;
             }
         }
-        if (fcharge) 
+        if (fcharge)
         {
             if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
             if (hgo[0].boundaries.size()==0)
@@ -879,7 +879,7 @@ int main(int argc, char **argv)
                 af.nprops["azx"]=CM(0,2);
                 af.nprops["azy"]=CM(1,2);
                 af.nprops["azz"]=CM(2,2);
-                
+
                 hgo[0].boundaries.resize(dbinsx+1);
                 hgo[1].boundaries.resize(dbinsy+1);
                 hgo[2].boundaries.resize(dbinsz+1);
@@ -889,50 +889,50 @@ int main(int argc, char **argv)
                 for (int i=0; i<3; ++i)
                 {
                     //if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
-                    hgo[i].window=HGWTriangle;
-                    switch(i) 
-                    { 
-                        case 0: va=drangeax; vb=drangebx; break;  
-                        case 1: va=drangeay; vb=drangeby; break;  
+                    hgo[i].window=HGWGauss5;
+                    switch(i)
+                    {
+                        case 0: va=drangeax; vb=drangebx; break;
+                        case 1: va=drangeay; vb=drangeby; break;
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
 
                     for (int k=0; k<hgo[i].boundaries.size();k++)
-                        hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1); 
+                        hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1);
                 }
                 //extra PBC folding (if the cell represents several unit cells and want density accumulated in a single one
                 hgo[0].boundaries*=(1./dfoldx);
                 hgo[1].boundaries*=(1./dfoldy);
                 hgo[2].boundaries*=(1./dfoldz);
                 ndh.set_options(hgo);
-                
+
                 if (fref!="") cubefr=reffr; else cubefr=af;    //take reference frame as provided
-                
-                
+
+
                 if (ldalign!="")
                 {
                     //we center the "COM" of labelled atoms  for alignment
                     AtomData ldcom; double ldnlab;
                     ldcom.x=ldcom.y=ldcom.z=ldnlab=0.;
-                    
+
                     //picks out the atoms for alignment
                     for (int i=0; i<cubefr.ats.size();++i)  if(chk_sel(cubefr.ats[i].name,ldalign))
-                    { 
+                    {
                         ++ldnlab; ldcom.x+=cubefr.ats[i].x; ldcom.y+=cubefr.ats[i].y; ldcom.z+=cubefr.ats[i].z;
-                        al_denssel.push_back(i); 
+                        al_denssel.push_back(i);
                     }
-                    ldcom.x/=ldnlab; ldcom.y/=ldnlab; ldcom.z/=ldnlab; 
-                    
-                    for (int i=0; i<cubefr.ats.size();++i) 
+                    ldcom.x/=ldnlab; ldcom.y/=ldnlab; ldcom.z/=ldnlab;
+
+                    for (int i=0; i<cubefr.ats.size();++i)
                     { cubefr.ats[i].x-=ldcom.x;  cubefr.ats[i].y-=ldcom.y;  cubefr.ats[i].z-=ldcom.z; }
-                    
-                    
+
+
                 }
-                for (int i=0; i<cubefr.ats.size();++i) 
+                for (int i=0; i<cubefr.ats.size();++i)
                     if(chk_sel(cubefr.ats[i].name,ldens)) denssel.push_back(i);
-                
+
             }
-            
+
             AtomFrame laf=af;
             if (ldalign!="")  micalign(cubefr, laf, al_denssel,true);
             al1.clear();  for (unsigned long i=0; i<denssel.size(); ++i)   al1.push_back(laf.ats[denssel[i]]);
@@ -947,8 +947,8 @@ int main(int argc, char **argv)
                 ndh.add(didata, (al1[i].name==std::string("O")?-2.0:1.0));
             }
         }
-          
-        if (fpca) 
+
+        if (fpca)
         {
             if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
             if (pcax.size()==0)
@@ -960,20 +960,20 @@ int main(int argc, char **argv)
                     AtomData lpccom; double lpcnlab;
                     lpccom.x=lpccom.y=lpccom.z=lpcnlab=0.;
                     for (int i=0; i<pcafr.ats.size();++i) if (chk_sel(pcafr.ats[i].name,lpcalign))
-                    {  
+                    {
                         lpcnlab+=1.; lpccom.x+=pcafr.ats[i].x; lpccom.y+=pcafr.ats[i].y; lpccom.z+=pcafr.ats[i].z;
                         al_pcasel.push_back(i);
                     }
-                    lpccom.x/=lpcnlab; lpccom.y/=lpcnlab; lpccom.z/=lpcnlab; 
-                        
-                    for (int i=0; i<pcafr.ats.size();++i) 
+                    lpccom.x/=lpcnlab; lpccom.y/=lpcnlab; lpccom.z/=lpcnlab;
+
+                    for (int i=0; i<pcafr.ats.size();++i)
                     { pcafr.ats[i].x-=lpccom.x;  pcafr.ats[i].y-=lpccom.y;  pcafr.ats[i].z-=lpccom.z; }
 
                 }
                 for (int i=0; i<pcafr.ats.size(); ++i) if (chk_sel(pcafr.ats[i].name, lpcat)) pcasel.push_back(i);
                 pcasz=pcasel.size();
                 pcax.resize(pcasz*3); pcax=0.;
-                if(!fpcanocov) pcaxx.resize(pcasz*3,pcasz*3); pcaxx*=0.; 
+                if(!fpcanocov) pcaxx.resize(pcasz*3,pcasz*3); pcaxx*=0.;
             }
 
             AtomFrame laf=af;
@@ -999,20 +999,20 @@ int main(int argc, char **argv)
             }
         }
 
-        if (fcv) 
+        if (fcv)
         {
             if (!fhavecell) ERROR("You must provide cell data in order to compute g(r)!");
 
             al1.clear();
-            if (lcv=="*") al1=af.ats; 
-            else for (unsigned long i=0; i<af.ats.size(); ++i) 
+            if (lcv=="*") al1=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
                 if (chk_sel(af.ats[i].name, lcv)) al1.push_back(af.ats[i]);
-            
-            //CV stuff 
+
+            //CV stuff
             std::valarray<double> cvv(al1.size());
             for (unsigned long i=0; i<al1.size(); ++i)
             {
-                cvv[i]=get_cv(al1,i,cvpars,CM,ICM,cvtype); 
+                cvv[i]=get_cv(al1,i,cvpars,CM,ICM,cvtype);
             }
             (*ocv) << al1.size()<<"\nOutput from trajworks colvar run\n";
             for (unsigned long i=0; i<al1.size(); ++i)
@@ -1021,35 +1021,35 @@ int main(int argc, char **argv)
             }
         }
 
-        if (fpd) 
+        if (fpd)
         {
-            if (npdat==0) 
+            if (npdat==0)
             {
                 fpd_inc.resize(af.ats.size()); fpd_inc=false;
-		for(unsigned long i=0; i<af.ats.size(); ++i)  if (lpdat=="*" || chk_sel(af.ats[i].name,lpdat) ) { fpd_inc[i]=true; npdat++; } 
+		for(unsigned long i=0; i<af.ats.size(); ++i)  if (lpdat=="*" || chk_sel(af.ats[i].name,lpdat) ) { fpd_inc[i]=true; npdat++; }
             }
             FMatrix<double> dpab(3,3,0.);
             for (unsigned long m=0; m<af.ats.size(); ++m) if (fpd_inc[m])
             {
                 if (af.ats[m].props.size()<3) ERROR("velocity data not available for atom "<<m<<".");
-                
+
                 for (int i=0; i<3; i++) for (int j=0; j<=i; j++)  pdtens2(i,j)+=(dpab(i,j)=af.ats[m].props[i]*af.ats[m].props[j]);
-                for (int i=0; i<3; i++) for (int j=0; j<=i; j++) for (int k=0; k<=j; k++) for (int l=0; l<=k; l++) 
+                for (int i=0; i<3; i++) for (int j=0; j<=i; j++) for (int k=0; k<=j; k++) for (int l=0; l<=k; l++)
                     pdtens4(i,j)(k,l)+=dpab(i,j)*dpab(k,l);
-                if (pdvec.size()==0) 
+                if (pdvec.size()==0)
                   hpd<<sqrt(af.ats[m].props[0]*af.ats[m].props[0]+af.ats[m].props[1]*af.ats[m].props[1]+af.ats[m].props[2]*af.ats[m].props[2]);
-                else 
+                else
                 { hpd<<fabs(af.ats[m].props[0]*pdvec[0]+af.ats[m].props[1]*pdvec[1]+af.ats[m].props[2]*pdvec[2]); }
             }
         }
-        if (fpproj) 
+        if (fpproj)
         {
             //!quick-and-dirty hack. must be optimized sometimes....
             for (unsigned long m=0; m<af.ats.size(); ++m)
             {
-                
+
                 double ppdist, ppmin; unsigned long ipp=0;
-                if (lppat1=="*" || chk_sel(af.ats[m].name,lppat1)) 
+                if (lppat1=="*" || chk_sel(af.ats[m].name,lppat1))
                 {
                 ipp=m; ppmin=1e100;
                 for (unsigned long p=0; p<af.ats.size(); ++p)
@@ -1069,7 +1069,7 @@ int main(int argc, char **argv)
                 }
                 if (ipp==m) continue;
                 double px,py,pz,rx,ry,rz;
-                px=af.ats[m].props[0]; py=af.ats[m].props[1]; pz=af.ats[m].props[2]; 
+                px=af.ats[m].props[0]; py=af.ats[m].props[1]; pz=af.ats[m].props[2];
                 dx=af.ats[m].x-af.ats[ipp].x;
                 dy=af.ats[m].y-af.ats[ipp].y;
                 dz=af.ats[m].z-af.ats[ipp].z;
@@ -1077,45 +1077,45 @@ int main(int argc, char **argv)
                 micpbc(1.,1.,1.,dx,dy,dz);
                 micmat(CM,dx,dy,dz);
                 ppdist=sqrt(dx*dx+dy*dy+dz*dz);
-                dx*=1./ppdist; dy*=1./ppdist; dz*=1./ppdist; 
+                dx*=1./ppdist; dy*=1./ppdist; dz*=1./ppdist;
                 if (af.ats[m].props.size()<3) ERROR("velocity data not available for atom "<<m<<".");
-                
+
                 ppmin=px*dx+py*dy+pz*dz;
                 (*opproj)<<ppmin<<" ";
                 px-=dx*ppmin; py-=dy*ppmin; pz-=dz*ppmin;
-                
+
                 //project the remaining on two random directions
                 rx=rng(); ry=rng(); rz=rng();
-                ppmin=rx*dx+ry*dy+rz*dz; 
-                rx-=dx*ppmin; ry-=dy*ppmin; rz-=dz*ppmin; 
+                ppmin=rx*dx+ry*dy+rz*dz;
+                rx-=dx*ppmin; ry-=dy*ppmin; rz-=dz*ppmin;
                 ppmin=1./sqrt(rx*rx+ry*ry+rz*rz);
-                rx*=ppmin; ry*=ppmin; rz*=ppmin; 
-                
+                rx*=ppmin; ry*=ppmin; rz*=ppmin;
+
                 ppmin=px*rx+py*ry+pz*rz;
                 (*opproj)<<ppmin<<" "<<sqrt(px*px+py*py+pz*pz-ppmin*ppmin)*(rng()>0.?1.:-1.)<<"\n";
                 }
             }
         }
-        if (fp3d) 
+        if (fp3d)
         {
-            if (np3dat==0) 
+            if (np3dat==0)
             {
                 fp3d_inc.resize(af.ats.size()); fp3d_inc=false;
-                for(unsigned long i=0; i<af.ats.size(); ++i)  if (lp3dat=="*" || chk_sel(af.ats[i].name,lp3dat) ) { fp3d_inc[i]=true; np3dat++; } 
+                for(unsigned long i=0; i<af.ats.size(); ++i)  if (lp3dat=="*" || chk_sel(af.ats[i].name,lp3dat) ) { fp3d_inc[i]=true; np3dat++; }
                 if (np3dat==0) ERROR("No atoms matching "<<lp3dat<<" have been found");
             }
             std::valarray<double> p3data(3);
             for (unsigned long i=0; i<af.ats.size(); ++i) if (fp3d_inc[i])
             {
                 if (af.ats[i].props.size()<3) ERROR("velocity data not available for atom "<<i<<".");
-                 
-                p3data[0]=af.ats[i].props[0]; p3data[1]=af.ats[i].props[1]; p3data[2]=af.ats[i].props[2]; 
+
+                p3data[0]=af.ats[i].props[0]; p3data[1]=af.ats[i].props[1]; p3data[2]=af.ats[i].props[2];
                 p3dh<<p3data;
                 if (fp3dinv) {p3data*=-1.; p3dh<<p3data; } //clearly, it would be better to symmetrize the histogram AFTERWARDS.
             }
         }
 
-        if (fgdr) 
+        if (fgdr)
         {
             if (!fhavecell) ERROR("You must provide cell data in order to compute g(r)!");
             al1.clear(); al2.clear();
@@ -1125,7 +1125,7 @@ int main(int argc, char **argv)
             if (lgdr2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
                 if (af.ats[i].name==lgdr2) al2.push_back(af.ats[i]);
-            
+
             for (unsigned long i=0; i<al1.size(); ++i)
                 for (unsigned long j=0; j<al2.size(); ++j)
             {
@@ -1144,13 +1144,13 @@ int main(int argc, char **argv)
         if (fvvac)
         {
             if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER uhm, box shouldn't really matters here....
-            if (vvnat==0) 
+            if (vvnat==0)
             {
                 fvvac_inc.resize(af.ats.size()); fvvac_inc=false;
-                if (vvindex.size()==0) 
+                if (vvindex.size()==0)
                 {  for(unsigned long i=0; i<af.ats.size(); ++i)  if (lvvac=="*" || chk_sel(af.ats[i].name,lvvac) ) { fvvac_inc[i]=true; vvnat++; } }
                 else
-                  for(unsigned long j=0; j<vvindex.size(); ++j) 
+                  for(unsigned long j=0; j<vvindex.size(); ++j)
                   {
                       if(vvindex[j]<0 || vvindex[j]>=af.ats.size()) ERROR("Provided atom index "<<vvindex[j]<<" is out of bounds.");
                       if (fvvac_inc[vvindex[j]]==false) {fvvac_inc[vvindex[j]]=true; vvnat++; }
@@ -1159,7 +1159,7 @@ int main(int argc, char **argv)
                 //init ACF array
                 vvacf.resize(vvnat*3);
                 ACOptions<AutoCorrelation<double> > aco; vvacf[0].get_options(aco); vvacf[0].reset(vvlag);
-                aco.f_exact_mean=true; aco.xmean=0.; vvacf[0].set_options(aco); 
+                aco.f_exact_mean=true; aco.xmean=0.; vvacf[0].set_options(aco);
                 for(unsigned long i=0; i<vvnat*3; ++i) vvacf[i]=vvacf[0];
             }
             //else if (vvnat!=af.ats.size()) ERROR("v-v autocorrelation cannot handle varying atomic number");
@@ -1172,7 +1172,7 @@ int main(int argc, char **argv)
                 vvacf[3*i+2]<<af.ats[j].props[2];
                 i++;
             }
-        }  
+        }
         if (fmsd)
         {
             //if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
@@ -1181,8 +1181,8 @@ int main(int argc, char **argv)
                 if (imsd==0)
                 {
                     fmsd_inc.resize(af.ats.size()); fmsd_inc=false;
-                    if (lmsd=="*") { fmsd_inc=true; msdnat=af.ats.size(); } 
-                    else for(unsigned long i=0; i<af.ats.size(); ++i) 
+                    if (lmsd=="*") { fmsd_inc=true; msdnat=af.ats.size(); }
+                    else for(unsigned long i=0; i<af.ats.size(); ++i)
                         if(af.ats[i].name==lmsd) { fmsd_inc[i]=true; msdnat++; }
                 }
                 imsd=0; refmsd=af;
@@ -1207,7 +1207,7 @@ int main(int argc, char **argv)
             tcharge=dip_tx.x=dip_tx.y=dip_tx.z=dip_cur.x=dip_cur.y=dip_cur.z=0.;
             for (unsigned long i=0; i<af.ats.size(); ++i)
             {
-                dx=af.ats[i].x; 
+                dx=af.ats[i].x;
                 dy=af.ats[i].y;
                 dz=af.ats[i].z;
                 /* MUST NOT APPLY PBCs!!!! au contraire, this breaks it all!
@@ -1227,14 +1227,14 @@ int main(int argc, char **argv)
             dip_cur.x-=tcharge*dip_tx.x;
             dip_cur.y-=tcharge*dip_tx.y;
             dip_cur.z-=tcharge*dip_tx.z;
-            ldip.push_back(dip_cur); 
+            ldip.push_back(dip_cur);
         }
-        
+
     }
 
     //normalize the histogram according to g(r) definition
-    
-    if (fgdr) 
+
+    if (fgdr)
     {
         std::cerr<<"# PRINTING OUT g(r) FOR "<<lgdr1<<" - "<<lgdr2<<" PAIR\n";
         std::valarray<double> r, w, gr;
@@ -1244,10 +1244,10 @@ int main(int argc, char **argv)
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
         else gr*=hgdr.samples()/(npfr*al1.size()*al2.size()/cvolume);
-        for (unsigned long i=0; i<r.size(); ++i) 
+        for (unsigned long i=0; i<r.size(); ++i)
             (*ogdr)<<r[i]<<" "<<gr[i]<<std::endl;
     }
-    if (fpd) 
+    if (fpd)
     {
         std::cerr<<"# PRINTING OUT PDF(p) FOR "<<lpdat<<" ATOM\n";
         std::valarray<double> p, w, pd;
@@ -1259,8 +1259,8 @@ int main(int argc, char **argv)
         std::vector<int> iii(4);
         for (int i=0; i<3; i++) for (int j=0; j<=i; j++) {
             (*opd)<<" # i= "<<i<<" j= "<<j<<std::endl;
-            for (int k=0; k<3; k++) { 
-                (*opd)<<" # "; 
+            for (int k=0; k<3; k++) {
+                (*opd)<<" # ";
                 //ack! awful sort!
                 for (int l=0; l<3; l++) {
                     iii[0]=i; iii[1]=j; iii[2]=(k>l?k:l); iii[3]=(k>l?l:k);
@@ -1268,20 +1268,20 @@ int main(int argc, char **argv)
                     (*opd)<<pdtens4(iii[3],iii[2])(iii[1],iii[0])-
                             (pdtens2(iii[3],iii[2])*pdtens2(iii[1],iii[0])+
                              pdtens2(iii[3],iii[1])*pdtens2(iii[2],iii[0])+
-                             pdtens2(iii[3],iii[0])*pdtens2(iii[2],iii[1]))<<" "; 
+                             pdtens2(iii[3],iii[0])*pdtens2(iii[2],iii[1]))<<" ";
                 } (*opd)<<std::endl;  }}
-        
-        
+
+
         hpd.get_bins(p, w, pd);
-        for (unsigned long i=0; i<p.size(); ++i) 
+        for (unsigned long i=0; i<p.size(); ++i)
             (*opd)<<p[i]<<" "<<pd[i]<<std::endl;
     }
-    if (fp3d) 
+    if (fp3d)
     {
         std::cerr<<"# PRINTING OUT P3DF(p) FOR "<<lp3dat<<" ATOM\n";
-        
-        
-        //prints out in CUBE format 
+
+
+        //prints out in CUBE format
         (*op3d)<<"# PRELIMINARY P3DF(p) OUTPUT"
                 <<"\n# Gaussian CUBE density format\n";
         //input is in A, but cube is always in bohr
@@ -1299,31 +1299,31 @@ int main(int argc, char **argv)
         //cube must be written out with z first
         for (int ix=0; ix<p3dbins; ++ix)  for (int iy=0; iy<p3dbins; ++iy)
         {
-            doshift=ix+p3dbins*iy; 
+            doshift=ix+p3dbins*iy;
             for (int iz=0; iz<p3dbins; ++iz)
             {
-                (*op3d)<<nb[doshift+iz*dozstep]<<"  "; 
+                (*op3d)<<nb[doshift+iz*dozstep]<<"  ";
                 if (iz%6==5) { (*op3d)<<std::endl; }
             }
             if (dbinsz%6!=0) (*op3d)<<std::endl;
         }
         (*op3d)<<std::endl;
     }
-    if (fvvac) 
+    if (fvvac)
     {
 
         std::valarray<double> vvt(vvlag+ftpad), vvw(vvlag+ftpad), vbt(vvlag+ftpad);
         vvt=0.; vvw=0.;
         for (unsigned long it=0; it<vvlag; ++it)
         {
-            for (unsigned long i=0; i<vvnat; ++i) 
+            for (unsigned long i=0; i<vvnat; ++i)
                 vvt[it]+=vvacf[3*i][it]*vvacf[3*i].sigma()*vvacf[3*i].sigma()
                         +vvacf[3*i+1][it]*vvacf[3*i+1].sigma()*vvacf[3*i+1].sigma()
                         +vvacf[3*i+2][it]*vvacf[3*i+2].sigma()*vvacf[3*i+2].sigma();
         }
         vbt=vvt;
         if (fvvacbox) for (unsigned long it=0; it<vvlag; ++it) vbt[it]=vvt[it]*(1.-double(it)/double(vvlag));
-        std::cerr<<"# PRINTING OUT v-v autocorrelation"<<(fvvacbox?" (triangle windowed) ":"")<<"\n"; 
+        std::cerr<<"# PRINTING OUT v-v autocorrelation"<<(fvvacbox?" (triangle windowed) ":"")<<"\n";
         //we are goood guys, so we also compute the FT of the vvac straight away
         fftw_plan r2rplan=fftw_plan_r2r_1d(vvlag+ftpad, &vbt[0], &vvw[0],
                                            FFTW_REDFT00, FFTW_ESTIMATE);
@@ -1332,7 +1332,7 @@ int main(int argc, char **argv)
         for (unsigned long it=0; it<vvlag+ftpad; ++it)
             (*ovvac) <<it*dt<<"  "<<vvt[it]<<"  "<<constant::pi*it/(dt*(vvlag+ftpad-1))<<"  "<<vvw[it]<<std::endl;
     }
-    if (fmsd) 
+    if (fmsd)
     {
         std::cerr<<"# PRINTING OUT msd\n";
         for (unsigned long it=0; it<msdlag; ++it)
@@ -1340,7 +1340,7 @@ int main(int argc, char **argv)
             (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]/msdnat<<std::endl;
         }
     }
-    if (fdipole) 
+    if (fdipole)
     {
         std::cerr<<"# PRINTING OUT dipole\n";
         for (unsigned long it=0; it<ldip.size(); ++it)
@@ -1358,8 +1358,8 @@ int main(int argc, char **argv)
                        << te_uiuj(i,2)/npfr-te_u0(i,2)*te_u0(i,2)/(npfr*npfr)<< "   "
                        << te_uiuj(i,3)/npfr-te_u0(i,0)*te_u0(i,1)/(npfr*npfr)<< "   "
                        << te_uiuj(i,4)/npfr-te_u0(i,0)*te_u0(i,2)/(npfr*npfr)<< "   "
-                       << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;        
-         }   
+                       << te_uiuj(i,5)/npfr-te_u0(i,1)*te_u0(i,2)/(npfr*npfr)<< std::endl;
+         }
          otherm->flush();
      }
     if (fcharge)
@@ -1368,22 +1368,22 @@ int main(int argc, char **argv)
         std::valarray<double> nb;
         double a2b1=(1./BOHR2ANG), a2b2=a2b1*a2b1, a2b3=a2b2*a2b1;
         double svolume=cvolume*(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz);
-        
+
         double xvoxel=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz);
-        double vvoxel=svolume/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz); 
-        
+        double vvoxel=svolume/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz);
+
         //volume of a voxel!
-        ndh.get_bins(nb);  
+        ndh.get_bins(nb);
         double dfout; ndh.get_outliers(dfout);
         std::cerr<<ndh.samples()*(1.-dfout)/npfr<<" smpl inside\n"<<dfout<<" outliers\n";
         std::cerr<<svolume/(ndh.samples()*(1.-dfout)/npfr)<<" vol per at\n";
         std::cerr<<nb.sum()/nb.size()<<" integral\n"<<nb.size()<<" che oh\n";
-    
+
         nb*=ndh.samples()/npfr*xvoxel/(vvoxel*a2b3)* (svolume*a2b3)/(svolume*a2b3);
-        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N 
+        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N
         double dmax=nb.max(), dmin=nb.min();
-        
-        //prints out in CUBE format 
+
+        //prints out in CUBE format
         (*ocharge)<<"# VOXEL VOLUME: (bohr^3) " <<vvoxel*a2b3
                 << " DENSITY (bohr^-3) RANGE : ["<<dmin<< ".."<<dmax
                 << "] AVERAGE: "<<nb.sum()/nb.size()
@@ -1395,7 +1395,7 @@ int main(int argc, char **argv)
         cy=(drangeay+(drangeby-drangeay)*0.5/dbinsy)/dfoldy;
         cz=(drangeaz+(drangebz-drangeaz)*0.5/dbinsz)/dfoldz;
         micmat(SCM,cx,cy,cz);
-        
+
         (*ocharge)<<cubefr.ats.size()<<" "<<cx<<" "<<cy<<" "<<cz<<"\n";
         //remember CM and ICM have x=2 z=0
         (*ocharge)<<dbinsx<<"  "
@@ -1411,7 +1411,7 @@ int main(int argc, char **argv)
                 <<SCM(1,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<" "
                 <<SCM(2,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<"\n";
         std::map<std::string, int> cubelab; int curlab=1;
-        for (int i=0; i<cubefr.ats.size(); ++i) 
+        for (int i=0; i<cubefr.ats.size(); ++i)
         {
             micmat(ICM,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
             micpbc(1.,1.,1.,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
@@ -1425,39 +1425,39 @@ int main(int argc, char **argv)
         //cube must be written out with z first
         for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy)
         {
-            doshift=ix+dbinsx*iy; 
+            doshift=ix+dbinsx*iy;
             for (int iz=0; iz<dbinsz; ++iz)
             {
-                (*ocharge)<<nb[doshift+iz*dozstep]<<"  "; 
+                (*ocharge)<<nb[doshift+iz*dozstep]<<"  ";
                 if (iz%6==5) { (*ocharge)<<std::endl; }
             }
             if (dbinsz%6!=0) (*ocharge)<<std::endl;
         }
         (*ocharge)<<std::endl;
-    
-   }         
+
+   }
     if (fdens)
     {
         std::cerr<<"# PRINTING OUT 3d density\n";
         std::valarray<double> nb;
         double a2b1=(1./BOHR2ANG), a2b2=a2b1*a2b1, a2b3=a2b2*a2b1;
         double svolume=cvolume*(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz);
-        
+
         double xvoxel=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz);
-        double vvoxel=svolume/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz); 
-        
+        double vvoxel=svolume/(dfoldx*dfoldy*dfoldz)/(dbinsx*dbinsy*dbinsz);
+
         //volume of a voxel!
-        ndh.get_bins(nb);  
+        ndh.get_bins(nb);
         double dfout; ndh.get_outliers(dfout);
         std::cerr<<ndh.samples()*(1.-dfout)/npfr<<" smpl inside\n"<<dfout<<" outliers\n";
         std::cerr<<svolume/(ndh.samples()*(1.-dfout)/npfr)<<" vol per at\n";
         std::cerr<<nb.sum()/nb.size()<<" integral\n"<<nb.size()<<" che oh\n";
-    
+
         nb*=ndh.samples()/npfr*xvoxel/(vvoxel*a2b3)* (svolume*a2b3)/(svolume*a2b3);
-        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N 
+        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N
         double dmax=nb.max(), dmin=nb.min();
-        
-        //prints out in CUBE format 
+
+        //prints out in CUBE format
         (*odens)<<"# VOXEL VOLUME: (bohr^3) " <<vvoxel*a2b3
                 << " DENSITY (bohr^-3) RANGE : ["<<dmin<< ".."<<dmax
                 << "] AVERAGE: "<<nb.sum()/nb.size()
@@ -1469,7 +1469,7 @@ int main(int argc, char **argv)
         cy=(drangeay+(drangeby-drangeay)*0.5/dbinsy)/dfoldy;
         cz=(drangeaz+(drangebz-drangeaz)*0.5/dbinsz)/dfoldz;
         micmat(SCM,cx,cy,cz);
-        
+
         (*odens)<<cubefr.ats.size()<<" "<<cx<<" "<<cy<<" "<<cz<<"\n";
         //remember CM and ICM have x=2 z=0
         (*odens)<<dbinsx<<"  "
@@ -1485,7 +1485,7 @@ int main(int argc, char **argv)
                 <<SCM(1,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<" "
                 <<SCM(2,2)*(drangebz-drangeaz)/dbinsz/dfoldz<<"\n";
         std::map<std::string, int> cubelab; int curlab=1;
-        for (int i=0; i<cubefr.ats.size(); ++i) 
+        for (int i=0; i<cubefr.ats.size(); ++i)
         {
             micmat(ICM,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
             micpbc(1.,1.,1.,cubefr.ats[i].x,cubefr.ats[i].y,cubefr.ats[i].z);
@@ -1499,18 +1499,18 @@ int main(int argc, char **argv)
         //cube must be written out with z first
         for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy)
         {
-            doshift=ix+dbinsx*iy; 
+            doshift=ix+dbinsx*iy;
             for (int iz=0; iz<dbinsz; ++iz)
             {
-                (*odens)<<nb[doshift+iz*dozstep]<<"  "; 
+                (*odens)<<nb[doshift+iz*dozstep]<<"  ";
                 if (iz%6==5) { (*odens)<<std::endl; }
             }
             if (dbinsz%6!=0) (*odens)<<std::endl;
         }
         (*odens)<<std::endl;
-        
+
         //if required, also outputs in DF3 format, for POVRAY
-        
+
 #define SWAP_2(x) ( (((x) & 0xff) << 8) | ((unsigned short)(x) >> 8) )
 #define SWAP_4(x) ( ((x) << 24) | \
         (((x) << 8) & 0x00ff0000) | \
@@ -1527,20 +1527,20 @@ int main(int argc, char **argv)
             tmp=((unsigned short int) dbinsx); FIX_SHORT(tmp); odpov->write((char *) &tmp,2);
             tmp=((unsigned short int) dbinsy); FIX_SHORT(tmp); odpov->write((char *) &tmp,2);
             tmp=((unsigned short int) dbinsz); FIX_SHORT(tmp); odpov->write((char *) &tmp,2);
-            for (int i=0; i<nb.size(); ++i) 
+            for (int i=0; i<nb.size(); ++i)
             {
                 //tmp=((unsigned short int) (65535.*nb[i]/dmax)); odpov->write((char *) &tmp,2);
                 //std::cerr<<((unsigned char) (65535.*(nb[i]-dmin)/(dmax-dmin)))<<"\n";
                 tmp=((unsigned short int) (65535.*(nb[i]-dmin)/(dmax-dmin))); FIX_SHORT(tmp); odpov->write((char *) &tmp,1);
             }
-            
+
             odpov->flush();
-        }    
-        
-         
+        }
+
+
         if (fdproj)
         {
-            
+
             //also prints out projected density. since I don't want to have 1000 open files, I reuse odens.
             //in order to make this efficient I should be very careful, but I only want it to WORK, so fuck the cache coherence
 #define H3D( ix, iy, iz)  (nb[ix+dbinsx*(iy+dbinsy*iz)])
@@ -1555,16 +1555,16 @@ int main(int argc, char **argv)
             lb.resize(dbinsx); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[ix]+=H3D(ix,iy,iz);
             lb*=1./(dbinsy*dbinsz);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densx")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densx")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             clen=sqrt(cubefr.nprops["axx"]*cubefr.nprops["axx"]+cubefr.nprops["axy"]*cubefr.nprops["axy"]+cubefr.nprops["axz"]*cubefr.nprops["axz"]);
             vvoxel=clen*(drangebx-drangeax)/dfoldx/dbinsx;
-            
-            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1 
+
+            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
                     <<"\n# Gaussian CUBE density format\n";
@@ -1573,25 +1573,25 @@ int main(int argc, char **argv)
                     <<clen*(drangebx-drangeax)/dbinsx/dfoldx*a2b1<<std::endl;
             for (int ix=0; ix<dbinsx; ++ix)
             {
-                (*odens)<<lb[ix]<<"  "; 
+                (*odens)<<lb[ix]<<"  ";
                 if (ix%6==5) { (*odens)<<std::endl; }
             }
             if (dbinsx%6!=0) (*odens)<<std::endl;
-            
+
             //!DENS Y
             lb.resize(dbinsy); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[iy]+=H3D(ix,iy,iz);
             lb*=1./(dbinsx*dbinsz);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densy")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densy")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             clen=sqrt(cubefr.nprops["ayx"]*cubefr.nprops["ayx"]+cubefr.nprops["ayy"]*cubefr.nprops["ayy"]+cubefr.nprops["ayz"]*cubefr.nprops["ayz"]);
             vvoxel=clen*(drangeby-drangeay)/dfoldy/dbinsy;
-            
-            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1 
+
+            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
                     <<"\n# Gaussian CUBE density format\n";
@@ -1600,25 +1600,25 @@ int main(int argc, char **argv)
                     <<clen*(drangeby-drangeay)/dbinsy/dfoldy*a2b1<<std::endl;
             for (int iy=0; iy<dbinsy; ++iy)
             {
-                (*odens)<<lb[iy]<<"  "; 
+                (*odens)<<lb[iy]<<"  ";
                 if (iy%6==5) { (*odens)<<std::endl; }
             }
             if (dbinsy%6!=0) (*odens)<<std::endl;
-            
+
             //!DENS Z
             lb.resize(dbinsz); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[iz]+=H3D(ix,iy,iz);
             lb*=1./(dbinsx*dbinsy);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densz")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densz")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             clen=sqrt(cubefr.nprops["azx"]*cubefr.nprops["azx"]+cubefr.nprops["azy"]*cubefr.nprops["azy"]+cubefr.nprops["azz"]*cubefr.nprops["azz"]);
             vvoxel=clen*(drangebz-drangeaz)/dfoldz/dbinsz;
-            
-            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1 
+
+            (*odens)<<"# VOXEL VOLUME: (bohr^1) " <<vvoxel*a2b1
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
                     <<"\n# Gaussian CUBE density format\n";
@@ -1627,28 +1627,28 @@ int main(int argc, char **argv)
                     <<clen*(drangebz-drangeaz)/dbinsz/dfoldz*a2b1<<std::endl;
             for (int iz=0; iz<dbinsz; ++iz)
             {
-                (*odens)<<lb[iz]<<"  "; 
+                (*odens)<<lb[iz]<<"  ";
                 if (iz%6==5) { (*odens)<<std::endl; }
             }
             if (dbinsz%6!=0) (*odens)<<std::endl;
-            
+
             //!DENS2 XY
             lb.resize(dbinsx*dbinsy); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[iy+dbinsy*ix]+=H3D(ix,iy,iz);
             lb*=1./(dbinsz);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densxy")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densxy")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             laa=sqrt(cubefr.nprops["axx"]*cubefr.nprops["axx"]+cubefr.nprops["axy"]*cubefr.nprops["axy"]+cubefr.nprops["axz"]*cubefr.nprops["axz"]);
             lba=sqrt(cubefr.nprops["axx"]*cubefr.nprops["ayx"]+cubefr.nprops["axy"]*cubefr.nprops["ayy"]+cubefr.nprops["axz"]*cubefr.nprops["ayz"])/laa;
             lbb=sqrt(cubefr.nprops["ayx"]*cubefr.nprops["ayx"]+cubefr.nprops["ayy"]*cubefr.nprops["ayy"]+cubefr.nprops["ayz"]*cubefr.nprops["ayz"]-lba*lba);
             carea=laa*lbb;
             vvoxel=carea*(drangebx-drangeax)/dfoldx/dbinsx*(drangeby-drangeay)/dfoldy/dbinsy;
-            
-            
+
+
             (*odens)<<"# VOXEL VOLUME: (bohr^2) " <<vvoxel*a2b2
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
@@ -1660,29 +1660,29 @@ int main(int argc, char **argv)
             {
                 for (int iy=0; iy<dbinsy; ++iy)
                 {
-                    (*odens)<<lb[iy+dbinsy*ix]<<"  "; 
+                    (*odens)<<lb[iy+dbinsy*ix]<<"  ";
                     if (iy%6==5) { (*odens)<<std::endl; }
                 }
                 if (dbinsy%6!=0) (*odens)<<std::endl;
             }
-            
+
             //!DENS2 YZ
             lb.resize(dbinsy*dbinsz); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[iz+dbinsz*iy]+=H3D(ix,iy,iz);
             lb*=1./(dbinsx);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densyz")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".densyz")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             laa=sqrt(cubefr.nprops["ayx"]*cubefr.nprops["ayx"]+cubefr.nprops["ayy"]*cubefr.nprops["ayy"]+cubefr.nprops["ayz"]*cubefr.nprops["ayz"]);
             lba=sqrt(cubefr.nprops["ayx"]*cubefr.nprops["azx"]+cubefr.nprops["ayy"]*cubefr.nprops["azy"]+cubefr.nprops["ayz"]*cubefr.nprops["azz"])/laa;
             lbb=sqrt(cubefr.nprops["azx"]*cubefr.nprops["azx"]+cubefr.nprops["azy"]*cubefr.nprops["azy"]+cubefr.nprops["azz"]*cubefr.nprops["azz"]-lba*lba);
             carea=laa*lbb;
             vvoxel=carea*(drangeby-drangeay)/dfoldy/dbinsy*(drangebz-drangeaz)/dfoldz/dbinsz;
-            
-            
+
+
             (*odens)<<"# VOXEL VOLUME: (bohr^2) " <<vvoxel*a2b2
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
@@ -1694,29 +1694,29 @@ int main(int argc, char **argv)
             {
                 for (int iz=0; iz<dbinsz; ++iz)
                 {
-                    (*odens)<<lb[iz+dbinsz*iy]<<"  "; 
+                    (*odens)<<lb[iz+dbinsz*iy]<<"  ";
                     if (iz%6==5) { (*odens)<<std::endl; }
                 }
                 if (dbinsz%6!=0) (*odens)<<std::endl;
             }
-            
+
             //!DENS2 ZX
             lb.resize(dbinsz*dbinsx); lb=0.;
             for (int ix=0; ix<dbinsx; ++ix)  for (int iy=0; iy<dbinsy; ++iy) for (int iz=0; iz<dbinsz; ++iz) lb[ix+dbinsx*iz]+=H3D(ix,iy,iz);
             lb*=1./(dbinsy);
-            
-            if (odens!=&std::cout)  
-            {  
-                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".denszx")).c_str());  
-                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific); 
+
+            if (odens!=&std::cout)
+            {
+                odens->flush(); delete odens; odens=new std::ofstream((prefix+std::string(".denszx")).c_str());
+                (*odens).precision(8); (*odens).width(15); (*odens).setf(std::ios::scientific);
             }
             laa=sqrt(cubefr.nprops["azx"]*cubefr.nprops["azx"]+cubefr.nprops["azy"]*cubefr.nprops["azy"]+cubefr.nprops["azz"]*cubefr.nprops["azz"]);
             lba=sqrt(cubefr.nprops["azx"]*cubefr.nprops["axx"]+cubefr.nprops["azy"]*cubefr.nprops["axy"]+cubefr.nprops["azz"]*cubefr.nprops["axz"])/laa;
             lbb=sqrt(cubefr.nprops["axx"]*cubefr.nprops["axx"]+cubefr.nprops["axy"]*cubefr.nprops["axy"]+cubefr.nprops["axz"]*cubefr.nprops["axz"]-lba*lba);
             carea=laa*lbb;
             vvoxel=carea*(drangebz-drangeaz)/dfoldz/dbinsz*(drangebx-drangeax)/dfoldx/dbinsx;
-            
-            
+
+
             (*odens)<<"# VOXEL VOLUME: (bohr^2) " <<vvoxel*a2b2
                     << " DENSITY (bohr^-3) RANGE : ["<<lb.min()<< ".."<<lb.max()
                     << "] AVERAGE: "<<lb.sum()/lb.size()
@@ -1728,7 +1728,7 @@ int main(int argc, char **argv)
             {
                 for (int ix=0; ix<dbinsx; ++ix)
                 {
-                    (*odens)<<lb[ix+dbinsx*iz]<<"  "; 
+                    (*odens)<<lb[ix+dbinsx*iz]<<"  ";
                     if (ix%6==5) { (*odens)<<std::endl; }
                 }
                 if (dbinsx%6!=0) (*odens)<<std::endl;
@@ -1736,7 +1736,7 @@ int main(int argc, char **argv)
         }
         std::cerr<<"# DENSITY OVER\n";
     }
-    
+
     if (fpca)
     {
         //first, fills up covariance matrix
@@ -1744,7 +1744,7 @@ int main(int argc, char **argv)
         if(!fpcanocov)
         {
             pcaxx*=(1./(npfr-1));
-            for (unsigned long i=0; i<3*pcasz; ++i) 
+            for (unsigned long i=0; i<3*pcasz; ++i)
             {
                 pcaxx(i,i)-=pcax[i]*pcax[i];
                 for (unsigned long j=0; j<i; ++j)
@@ -1765,24 +1765,24 @@ int main(int argc, char **argv)
             (*opcaxyz)<<std::endl;
             std::cerr<<"XYZ CENTER FILE WRITTEN\n";
         }
-        
+
         if (!fpcanocov) {
             FMatrix<double> Q; std::valarray<double> ev;
             EigenSolverSym(pcaxx,Q,ev);
-            
+
             //NOW WRITES F**ING GAUSSIAN LOG FILE
             (*opca)<<" Entering Gaussian System\nthis file is generated from the MLDGAU subroutine in the file secder.F\nStandard orientation:\n ---------------------------------------------------------------------\nCenter     Atomic     Atomic              Coordinates (Angstroms)\nNumber     Number      Type              X           Y           Z\n---------------------------------------------------------------------"<<std::endl;
-            for (unsigned long i=0; i<pcasz; ++i) 
+            for (unsigned long i=0; i<pcasz; ++i)
                (*opca)<<i+1<<"  "<<1<<"   "<<0<<"    "<<pcax[3*i]<<"  "<<pcax[3*i+1]<<"  "<<pcax[3*i+2]<<std::endl;
             (*opca)<<" ---------------------------------------------------------------------\nbasis functions          primitive gaussians\nalpha electrons          beta electrons\n**********************************************************************"<<std::endl;
             (*opca)<<"\nHarmonic frequencies (cm**-1), IR intensities (KM/Mole),\nRaman scattering activities (A**4/AMU), Raman depolarization ratios,\nreduced masses (AMU), force constants (mDyne/A) and normal coordinates:\n";
-            for (unsigned long i=0; i<pcasz; ++i) 
+            for (unsigned long i=0; i<pcasz; ++i)
             {
                 (*opca)<< 3*i<< "  "<<3*i +1 <<"  "<< 3*i+2<<std::endl<<
                         " ?A                     ?A                     ?A\n Frequencies --   "<<
                         ev[3*i]<<"   "<<ev[3*i+1]<<"   "<< ev[3*i+2]<<std::endl<<
                         " Red. masses --     0.0000                 0.0000                 0.0000\n Frc consts  --     0.0000                 0.0000                 0.0000\n IR Inten    --     0.0000                 0.0000                 0.0000\n Raman Activ --     0.0000                 0.0000                 0.0000\nDepolar     --     0.0000                 0.0000                 0.0000\n Atom AN      X      Y      Z        X      Y      Z        X      Y      Z\n";
-                for (unsigned long j=0; j<pcasz; ++j) 
+                for (unsigned long j=0; j<pcasz; ++j)
                 {
                     (*opca)<<j<<"  1  "<< Q(3*j,3*i) << "  "<< Q(3*j+1,3*i) <<"  "<<Q(3*j+2,3*i) <<"  "
                             << Q(3*j,3*i+1) << "  "<< Q(3*j+1,3*i+1) <<"  "<<Q(3*j+2,3*i+1) <<"  "
@@ -1794,16 +1794,16 @@ int main(int argc, char **argv)
         (*opca)<<"[FREQ]"<<std::endl;
         for (unsigned long i=0; i<3*pcasz; ++i) (*opca)<<ev[i]<<"\n";
         (*opca)<<"[FR-COORD]"<<std::endl;
-        for (unsigned long i=0; i<pcasz; ++i) 
+        for (unsigned long i=0; i<pcasz; ++i)
             (*opca)<<lpcat<<"  "<<pcax[3*i]<<"  "<<pcax[3*i+1]<<"  "<<pcax[3*i+2]<<std::endl;
         (*opca)<<"[FR-NORM-COORD]"<<std::endl;
-        for (unsigned long i=0; i<3*pcasz; ++i) 
+        for (unsigned long i=0; i<3*pcasz; ++i)
         {
             (*opca)<<"vibration "<<i<<std::endl;
-            for (unsigned long j=0; j<pcasz; ++j) 
+            for (unsigned long j=0; j<pcasz; ++j)
                 (*opca)<<Q(3*j,i)<<"  "<<Q(3*j+1,i)<<"  "<<Q(3*j+2,i)<<std::endl;
         }*/
         }
-    }   
+    }
     return 0;
 }
