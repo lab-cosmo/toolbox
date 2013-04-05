@@ -317,7 +317,7 @@ void banner()
             << " -unwrap   unwraps PBCs, i.e. makes sure trajectories are continuous....        \n"
             << " -vbox     enables variable box (to be read from DLP or sequentially from box)  \n"
             << " -lab file reads atoms labels from file ( lab1 lab2 lab3....  )                 \n"
-            << " -hwin     windowing for all histograms (triangle|box|delta) [delta]            \n"
+            << " -hwin     window for all histo (triangle|box|delta|gauss-[1,2,3,5]) [delta]    \n"
             << " -hwinfac  size of the window, as a function of the interval [1.0]              \n"
             << " ## g(r) OPTIONS:   activate by -gr                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
@@ -468,6 +468,10 @@ int main(int argc, char **argv)
     if (shwin=="triangle") hwin=HGWTriangle;
     else if (shwin=="box") hwin=HGWBox;
     else if (shwin=="delta") hwin=HGWDelta;
+    else if (shwin=="gauss-1") hwin=HGWGauss1;
+    else if (shwin=="gauss-2") hwin=HGWGauss2;
+    else if (shwin=="gauss-3") hwin=HGWGauss3;
+    else if (shwin=="gauss-5") hwin=HGWGauss5;
     else ERROR("Unsupported histogram windowing mode");
 
 
@@ -798,6 +802,7 @@ int main(int argc, char **argv)
                 double va,vb;
                 for (int i=0; i<3; ++i)
                 {
+                    hgo[i].walls=HGBPeriodic;
                     if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
                     switch(i)
                     {
@@ -888,8 +893,8 @@ int main(int argc, char **argv)
                 double va,vb;
                 for (int i=0; i<3; ++i)
                 {
-                    //if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
-                    hgo[i].window=HGWGauss5;
+                    if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
+                    hgo[i].walls=HGBPeriodic;
                     switch(i)
                     {
                         case 0: va=drangeax; vb=drangebx; break;
@@ -943,8 +948,9 @@ int main(int argc, char **argv)
                 didata[0]=al1[i].x;  didata[1]=al1[i].y; didata[2]=al1[i].z;
                 micmat(ICM,didata[0],didata[1],didata[2]);
                 if (ldalign=="") micpbc(1./dfoldx,1./dfoldy,1./dfoldz,didata[0],didata[1],didata[2]);  //if we have aligned, we ALREADY HAVE APPLIED PBC AT THE GOOD MOMENT!
-               std::cerr<<densw<<al1[i].name<<(al1[i].name==std::string("O")?-2.0:1.0)<<std::endl;
-                ndh.add(didata, (al1[i].name==std::string("O")?-2.0:1.0));
+               if (al1[i].props.size()<1) ERROR("charge data not available for atom "<<i<<".");
+               //std::cerr<<densw<<al1[i].name<<(al1[i].name==std::string("O")?-2.0:1.0)<<std::endl;
+                ndh.add(didata, al1[i].props[0]);
             }
         }
 

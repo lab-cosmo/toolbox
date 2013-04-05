@@ -10,7 +10,7 @@ void banner()
     std::cerr
             << " USAGE: ndhistogram -d dims -xi 'xi1,...,xin' -xf 'xf1,...,xfn'                 \n"
             << "                    [-n 'n1,...,nn'] [-b 'b1,...,bn'] [-w] [-g] [-avg]          \n"
-            << "                    [-as mode(parameters)] [-whard]                             \n"
+            << "                    [-as mode(parameters)] [-whard|-wperi]                      \n"
             << "                                                                                \n"
             << " compute the histogram of a series of data, in ndim dimensions.                 \n"
             << " data must be formatted as                                                      \n"
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 {
 
     CLParser clp(argc, argv);
-    bool fhelp, fweighted, fgnu, fperiodic, faverage, fhard;
+    bool fhelp, fweighted, fgnu, faverage, fhard, fperi;
     std::string a,b,wb,nbins,asmooth,asfun;
     unsigned long ndim;
     bool fok=
@@ -68,9 +68,9 @@ int main(int argc, char **argv)
             clp.getoption(asmooth,"as",std::string("")) &&
             clp.getoption(asfun,"asf",std::string("linear")) &&
             clp.getoption(fweighted,"w",false) &&
-            clp.getoption(fperiodic,"p",false) &&
             clp.getoption(faverage,"avg",false) &&
             clp.getoption(fhard,"whard",false) &&
+            clp.getoption(fperi,"wperi",false) &&
             clp.getoption(fgnu,"g",false) &&
             clp.getoption(fhelp,"h",false);
 
@@ -103,15 +103,17 @@ int main(int argc, char **argv)
     for (int i=0; i<ndim; ++i)
     {
         hgo[i].window=(vw.size()==0?HGWDelta:HGWTriangle);
-        hgo[i].walls=(fhard?HGBHard:HGBNormal);    //!this should be done per direction.
+        if (fhard) hgo[i].walls=HGBHard;  //!this should be done per direction.
+        else if (fperi) hgo[i].walls=HGBPeriodic;
+        else hgo[i].walls=HGBNormal;
         hgo[i].window_width=(vw.size()==0 || hgo[i].window==HGWDelta?0.:vw[i]);
         hgo[i].boundaries.resize((vn.size()==0?101:vn[i]+1));
-        if (!fperiodic)
+        //if (!fperiodic)
         {
            for (int k=0; k<hgo[i].boundaries.size();k++)
              hgo[i].boundaries[k]=va[i]+k*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
         }
-        else
+        /*else
         {
            //allocates extra buffer for the tails of the kernels to be folded back into the period
            pbin[i]=ceil((hgo[i].boundaries.size()-1.0)*hgo[i].window_width/(vb[i]-va[i]));
@@ -120,14 +122,14 @@ int main(int argc, char **argv)
            hgo[i].boundaries.resize(hgo[i].boundaries.size()+2*pbin[i]);
            for (int k=0; k<hgo[i].boundaries.size();k++)
              hgo[i].boundaries[k]=pva[i]+k*(pvb[i]-pva[i])/(hgo[i].boundaries.size()-1);
-        }
+        }*/
     }
 
     NDHistogram<double> HG(hgo);
     NDHistogram<double> HGY(hgo);
 
     std::valarray<double> val(ndim); double weight, y, ty, ny;
-   
+
     ty=ny=0.0;
     while (std::cin.good()) {
          for (int i=0; i<ndim; ++i) std::cin>>val[i];
@@ -154,7 +156,7 @@ int main(int argc, char **argv)
         //ALSO PERIODIC ACTUALLY WORKS ONLY IN 2D. TOTALLY NEEDS CLEANING UP AND GENERALIZING!!!
         if (ndim!=2) ERROR("GNUPLOT format works only for dimension 2\n");
         std::valarray<long> ind(2); std::valarray<double> cen(2); double val, valy;
-        if (!fperiodic)
+        //if (!fperiodic)
         for (int i=0; i<hgo[0].boundaries.size()-1; ++i)
         {
             for (int j=0; j<hgo[1].boundaries.size()-1; ++j)
@@ -175,7 +177,7 @@ int main(int argc, char **argv)
             }
             std::cout<<std::endl;
         }
-        else
+/*        else
         {
         std::valarray<double> pcen(2); double pval;
         long bs[2];
@@ -216,7 +218,7 @@ int main(int argc, char **argv)
             }
             std::cout<<std::endl;
         }
-        }
+        }*/
     }
     } else {
       if (!fgnu) { ERROR("Multidimensional smoothing not implemented\n"); }
