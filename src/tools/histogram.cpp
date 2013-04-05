@@ -7,7 +7,7 @@ using namespace toolbox;
 void banner()
 {
     std::cerr
-            << " USAGE: histogram -xi xi -xf xf [-n nbins] [-whard ] [-w] [-avg]  \n"
+            << " USAGE: histogram -xi xi -xf xf [-n nbins] [-whard|-wnorm|-wperi] [-w] [-avg]  \n"
             << "                  [(-b box-w|-t tri-w|-g1 g1-w|-g2 g2-w|-g3 g3-w|-g5 g5-w)]      \n"
             << " compute the histogram of a series of data, with nbins (default:100) bins       \n"
             << " distributed evenly between xi and xf. optionally, box (b) or triangular (t)  \n"
@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     HGOptions<Histogram<double> > hgopts;
 
     CLParser clp(argc, argv);
-    bool fhelp, fweighted, faverage, fhard;
+    bool fhelp, fweighted, faverage, fhard, fnorm, fperi;
     double a,b,wb,wt,wg1,wg2,wg3,wg5;
     unsigned long nbins;
     bool fok=
@@ -40,6 +40,8 @@ int main(int argc, char **argv)
             clp.getoption(fweighted,"w",false) &&
             clp.getoption(faverage,"avg",false) &&
             clp.getoption(fhard,"whard",false) &&
+            clp.getoption(fnorm,"wnorm",false) &&
+            clp.getoption(fperi,"wperi",false) &&
             clp.getoption(fhelp,"h",false);
 
     if ( fhelp || ! fok) { banner(); return 0; }
@@ -58,6 +60,8 @@ int main(int argc, char **argv)
     else             { hgo.window=HGWDelta; hgo.window_width=0.; }
 
     if (fhard) hgo.walls=HGBHard;
+    else if (fnorm) hgo.walls=HGBHardNorm;
+    else if (fperi) hgo.walls=HGBPeriodic;
     HG.set_options(hgo); HGY.set_options(hgo);
 
     double val, weight, y, ty, ny;

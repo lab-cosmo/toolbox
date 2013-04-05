@@ -17,7 +17,7 @@ namespace toolbox {
     template <class U> class HGOptions;
 
     enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle,  HGWGauss1,  HGWGauss2,  HGWGauss3,   HGWGauss5 };
-    enum HGBoundaryMode {HGBNormal,  HGBHard, HGBPeriodic };
+    enum HGBoundaryMode {HGBNormal,  HGBHard,  HGBHardNorm,  HGBPeriodic };
 
 
     template <class U> class HGOptions<Histogram<U> > {
@@ -52,12 +52,15 @@ namespace toolbox {
         double below, above;
         double ndata;
         HGOptions<Histogram<U> > opts;
+        double range, center;
 
     public:
         void reset()
         {
             bins.resize(opts.boundaries.size()-1);
             bins=0.; ndata=0; above=below=0.;
+            range=opts.boundaries[opts.boundaries.size()-1]-opts.boundaries[0];
+            center=(opts.boundaries[opts.boundaries.size()-1]+opts.boundaries[0])*0.5;
         }
 
         double samples() { return ndata; }
@@ -218,10 +221,15 @@ namespace toolbox {
     }
 
     template<class U>
-    void Histogram<U>::add(const U& nel, double weight)
+    void Histogram<U>::add(const U& pnel, double weight)
     {
         long bs=bins.size(),ia=0, ib=bs/2, ic=bs;
-        //First, finds in which bin lies the center
+        double nel=pnel;
+
+        if (opts.walls==HGBPeriodic)  //folds into the interval
+        {   nel=nel/range;   nel=center+range*(nel-round(nel));   }
+
+        //First, finds in which bin lies the center (this works also if bins have different sizes)
         while (ib>ia && ib<ic)
         {
             if (nel>opts.boundaries[ib+1])
@@ -268,9 +276,50 @@ namespace toolbox {
         }
         if (opts.window!=HGWDelta)
         {
-            double nb=0.;
+            double nb=0.; double hw;
             switch(opts.walls)
             {
+            case HGBPeriodic: // Periodic walls, apply minimum image convention
+                //adds weights for bins smaller than ib (possibly going round)
+                for (ia=ib-1; ia>=0; --ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=nb*weight;
+                }
+                if (ia<0)  //spill over
+                {
+                    hw=nel+range;
+                    //makes sure not to count points twice by stopping at ib
+                    for (ia=bs-1; ia>=ib; --ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    if (ia<ib) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+
+                for (ia=ib; ia<bs; ++ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=weight*nb;
+                }
+
+                if (ia==bs)
+                {
+                    hw=nel-range;
+                    for (ia=0; ia<ib; ++ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    if (ia==ib) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+                break;
+
             case HGBNormal: // Normal walls, density will spill out
                 //adds weights for bins smaller than ib
                 for (ia=ib-1; ia>=0; --ia)
@@ -290,12 +339,11 @@ namespace toolbox {
                 if (ia==bs)
                     above+=weight*wf((opts.boundaries[bs]-nel)/opts.window_width,std::numeric_limits<U>::max());
                 break;
-            case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
-                double hw;
+
+            case HGBHard:  // Hard walls, constraint the density to the available space -- with asymmetric kernel.
                 // if the point is outside it is completely discarded
                 if (nel<opts.boundaries[0]) {below+=weight; break; }
                 if (nel>opts.boundaries[bs]) {above+=weight; break; }
-
                 // integrate below nel
                 hw=nel-opts.boundaries[0];
                 if (hw>opts.window_width) hw=opts.window_width;
@@ -330,6 +378,35 @@ namespace toolbox {
                 }
 
                 break;
+            case HGBHardNorm:  // Hard walls, constraint the density to the available space -- with renormalization.
+                // if the point is outside it is completely discarded
+                if (nel<opts.boundaries[0]) {below+=weight; break; }
+                if (nel>opts.boundaries[bs]) {above+=weight; break; }
+
+                hw=0.0;
+                //get the amount of density that would spill out below
+                if (nel-opts.boundaries[0]<opts.window_width)
+                {  hw+=wf(-1.0,(opts.boundaries[0]-nel)/opts.window_width);  }
+                if (opts.boundaries[bs]-nel<opts.window_width)
+                {  hw+=wf((opts.boundaries[bs]-nel)/opts.window_width,1.0);  }
+                //get the re-normalizing factor
+                hw=1.0/(1.0-hw);
+
+                above=1;
+                for (ia=ib-1; ia>=0; --ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=nb*hw*weight;
+                }
+                for (ia=ib; ia<bs; ++ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=weight*hw*nb;
+                }
             }
         }
         ndata+=weight;
