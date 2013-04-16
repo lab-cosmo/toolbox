@@ -8,14 +8,16 @@
 #define __TOOLS_HISTOGRAM_H
 
 #include "tbdefs.hpp"
+#include "math.h"
 #include <vector>
 #include <limits>
+
 namespace toolbox {
     template <class U> class Histogram;
     template <class U> class HGOptions;
 
-    enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle};
-    enum HGBoundaryMode {HGBNormal,  HGBHard, HGBPeriodic };
+    enum HGWindowMode {HGWDelta,  HGWBox, HGWTriangle,  HGWGauss1,  HGWGauss2,  HGWGauss3,   HGWGauss5 };
+    enum HGBoundaryMode {HGBNormal,  HGBHard,  HGBHardNorm,  HGBPeriodic };
 
 
     template <class U> class HGOptions<Histogram<U> > {
@@ -50,12 +52,15 @@ namespace toolbox {
         double below, above;
         double ndata;
         HGOptions<Histogram<U> > opts;
+        double range, center;
 
     public:
         void reset()
         {
             bins.resize(opts.boundaries.size()-1);
             bins=0.; ndata=0; above=below=0.;
+            range=opts.boundaries[opts.boundaries.size()-1]-opts.boundaries[0];
+            center=(opts.boundaries[opts.boundaries.size()-1]+opts.boundaries[0])*0.5;
         }
 
         double samples() { return ndata; }
@@ -139,7 +144,6 @@ namespace toolbox {
     template<class U>
     double __hgwfbox(const U& a, const U& b)
     {
-        //std::cerr<<a<<","<<b;
         if (b<=-0.5 || a >=0.5) return 0.;
 
         U ia, ib;
@@ -151,7 +155,6 @@ namespace toolbox {
     template<class U>
     double __hgwftri(const U& a, const U& b)
     {
-        //std::cerr<<a<<","<<b;
         if (b<=-1. || a >=1.) return 0.;
 
         U ia, ib;
@@ -161,11 +164,72 @@ namespace toolbox {
         return (ib*(2.-fabs(ib))-ia*(2.-fabs(ia)))*0.5;
     }
 
+#define G1ERF1 5.03149608121118568
+#define G1DY   0.24197072451914334980
     template<class U>
-    void Histogram<U>::add(const U& nel, double weight)
+    double __hgwfgauss1(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib/constant::sqrt2)-erf(ia/constant::sqrt2)) *0.5 -(ib-ia)*G1DY )*G1ERF1;
+    }
+
+#define G2ERF1 1.354030373543121523
+#define G2DY   0.10798193302637610390
+    template<class U>
+    double __hgwfgauss2(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*2/constant::sqrt2)-erf(ia*2/constant::sqrt2)) *0.5 -(ib-ia)*G2DY )*G2ERF1;
+    }
+
+#define G3ERF1 1.030174731161562310
+#define G3DY   0.01329554523581402153
+    template<class U>
+    double __hgwfgauss3(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*3/constant::sqrt2)-erf(ia*3/constant::sqrt2)) *0.5 -(ib-ia)*G3DY )*G3ERF1;
+    }
+
+#define G5ERF1 1.00001544073670377005281
+#define G5DY   7.43359757367148854e-6
+    template<class U>
+    double __hgwfgauss5(const U& a, const U& b)
+    {
+        if (b<=-1. || a >=1.) return 0.;
+
+        U ia, ib;
+        ia=(a>-1.?a:-1.);
+        ib=(b< 1.?b:1.);
+
+        return ((erf(ib*5/constant::sqrt2)-erf(ia*5/constant::sqrt2)) *0.5 -(ib-ia)*G5DY )*G5ERF1;
+    }
+
+    template<class U>
+    void Histogram<U>::add(const U& pnel, double weight)
     {
         long bs=bins.size(),ia=0, ib=bs/2, ic=bs;
-        //First, finds in which bin lies the center
+        U nel=pnel;
+
+        if (opts.walls==HGBPeriodic)  //folds into the interval
+        {   nel=nel/range;   nel=center+range*(nel-round(nel));   }
+
+        //First, finds in which bin lies the center (this works also if bins have different sizes)
         while (ib>ia && ib<ic)
         {
             if (nel>opts.boundaries[ib+1])
@@ -195,14 +259,67 @@ namespace toolbox {
         case HGWTriangle:
             wf=__hgwftri;
             break;
+        case HGWGauss1:
+            wf=__hgwfgauss1;
+            break;
+        case HGWGauss2:
+            wf=__hgwfgauss2;
+            break;
+        case HGWGauss3:
+            wf=__hgwfgauss3;
+            break;
+        case HGWGauss5:
+            wf=__hgwfgauss5;
+            break;
         default:
             ERROR("Windowing mode not implemented yet!\n");
         }
         if (opts.window!=HGWDelta)
         {
-            double nb=0.;
+            double nb=0.; double hw;
             switch(opts.walls)
             {
+            case HGBPeriodic: // Periodic walls, apply minimum image convention
+                //adds weights for bins smaller than ib (possibly going round)
+                for (ia=ib-1; ia>=0; --ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=nb*weight;
+                }
+                if (ia<0)  //spill over
+                {
+                    hw=nel+range;
+                    //makes sure not to count points twice by stopping at ib
+                    for (ia=bs-1; ia>=ib; --ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    if (ia<ib) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+
+                for (ia=ib; ia<bs; ++ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=weight*nb;
+                }
+
+                if (ia==bs)
+                {
+                    hw=nel-range;
+                    for (ia=0; ia<ib; ++ia)
+                    {
+                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                                /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                        if (nb==0) break; else bins[ia]+=nb*weight;
+                    }
+                    if (ia==ib) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+                break;
+
             case HGBNormal: // Normal walls, density will spill out
                 //adds weights for bins smaller than ib
                 for (ia=ib-1; ia>=0; --ia)
@@ -222,16 +339,16 @@ namespace toolbox {
                 if (ia==bs)
                     above+=weight*wf((opts.boundaries[bs]-nel)/opts.window_width,std::numeric_limits<U>::max());
                 break;
-            case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
-                double hw;
+
+            case HGBHard:  // Hard walls, constraint the density to the available space -- with asymmetric kernel.
                 // if the point is outside it is completely discarded
                 if (nel<opts.boundaries[0]) {below+=weight; break; }
                 if (nel>opts.boundaries[bs]) {above+=weight; break; }
-
                 // integrate below nel
                 hw=nel-opts.boundaries[0];
                 if (hw>opts.window_width) hw=opts.window_width;
 
+                //get the amount of density that would spill out
                 if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
                 else
                 {
@@ -261,6 +378,35 @@ namespace toolbox {
                 }
 
                 break;
+            case HGBHardNorm:  // Hard walls, constraint the density to the available space -- with renormalization.
+                // if the point is outside it is completely discarded
+                if (nel<opts.boundaries[0]) {below+=weight; break; }
+                if (nel>opts.boundaries[bs]) {above+=weight; break; }
+
+                hw=0.0;
+                //get the amount of density that would spill out below
+                if (nel-opts.boundaries[0]<opts.window_width)
+                {  hw+=wf(-1.0,(opts.boundaries[0]-nel)/opts.window_width);  }
+                if (opts.boundaries[bs]-nel<opts.window_width)
+                {  hw+=wf((opts.boundaries[bs]-nel)/opts.window_width,1.0);  }
+                //get the re-normalizing factor
+                hw=1.0/(1.0-hw);
+
+                above=1;
+                for (ia=ib-1; ia>=0; --ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=nb*hw*weight;
+                }
+                for (ia=ib; ia<bs; ++ia)
+                {
+                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    if (nb==0) break; else bins[ia]+=weight*hw*nb;
+                }
             }
         }
         ndata+=weight;
@@ -273,7 +419,7 @@ namespace toolbox {
 template <class U> class NDHistogram {
 private:
     unsigned long dim;
-    std::valarray<double> bins, vols;
+    std::valarray<double> bins, vols, range, center;
     std::valarray<long> nbin;
     double outliers;
     double ndata;
@@ -304,6 +450,13 @@ public:
             for (int i=0; i<dim; ++i) vols[k]*=(opts[i].boundaries[cp[i]+1]-opts[i].boundaries[cp[i]]);
             k++; cp[0]++;
             for (int i=0; i<dim-1; ++i) if (cp[i]>=nbin[i]) {cp[i]=0; ++cp[i+1];}
+        }
+
+        range.resize(dim); center.resize(dim);
+        for (int i=0; i<dim; ++i)
+        {
+            range[i]=opts[i].boundaries[opts[i].boundaries.size()-1]-opts[i].boundaries[0];
+            center[i]=0.5*(opts[i].boundaries[opts[i].boundaries.size()-1]+opts[i].boundaries[0]);
         }
     }
 
@@ -398,8 +551,13 @@ std::ostream& operator<<(std::ostream& os, const NDHistogram<U>& his)
 }
 
 template<class U>
-void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
+void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
 {
+    std::valarray<U> nel(pnel);
+
+    for (int i=0; i<dim; ++i) if (opts[i].walls==HGBPeriodic)  //folds into the interval
+    {   nel[i]=nel[i]/range[i];   nel[i]=center[i]+range[i]*(nel[i]-round(nel[i]));   }
+
     std::valarray<long> p(dim);
     long bs, ia, ib, ic;
     //First, finds the "coordinates" of the center
@@ -442,14 +600,62 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
         case HGWTriangle:
             wf=__hgwftri;
             break;
+        case HGWGauss1:
+            wf=__hgwfgauss1;
+            break;
+        case HGWGauss2:
+            wf=__hgwfgauss2;
+            break;
+        case HGWGauss3:
+            wf=__hgwfgauss3;
+            break;
+        case HGWGauss5:
+            wf=__hgwfgauss5;
+            break;
         default:
             ERROR("Windowing mode not implemented yet!\n");
         }
         if (opts[i].window!=HGWDelta)
         {
-            double nb=0.;
+            double nb=0.;   double hw;
+
             switch(opts[i].walls)
             {
+            case HGBPeriodic: // Periodic walls, apply minimum image convention
+                //adds weights for bins smaller than ib (possibly going round)
+                for (ia=p[i]-1; ia>=0; --ia)
+                {
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    if (nb==0) break; else tbins[i][ia]+=nb;
+                }
+                if (ia<0)  //spill over
+                {
+                    hw=nel[i]+range[i];
+                    //makes sure not to count points twice
+                    for (ia=nbin[i]-1; ia>=p[i]; --ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-hw)/opts[i].window_width,(opts[i].boundaries[ia+1]-hw)/opts[i].window_width);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    if (ia<p[i]) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+
+                for (ia=p[i]; ia<nbin[i]; ++ia)
+                {
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    if (nb==0) break; else tbins[i][ia]+=nb;
+                }
+                if (ia==nbin[i])
+                {
+                    hw=nel[i]-range[i];
+                    for (ia=0; ia<p[i]; ++ia)
+                    {
+                        nb=wf((opts[i].boundaries[ia]-hw)/opts[i].window_width,(opts[i].boundaries[ia+1]-hw)/opts[i].window_width);
+                        if (nb==0) break; else tbins[i][ia]+=nb;
+                    }
+                    if (ia==p[i]) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
+                }
+                break;
             case HGBNormal: // Normal walls, density will spill out
                 for (ia=p[i]-1; ia>=0; --ia)
                 {
@@ -464,8 +670,6 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
                 break;
 
             case HGBHard:  // Hard walls, constraint the density to the available space -- unless a point is completely outside.
-                double hw;
-
                 // if point is outside, discards it completely
                 if (nel[i]<opts[i].boundaries[0]) break;
                 if (nel[i]>opts[i].boundaries[nbin[i]]) break;
@@ -506,14 +710,15 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
     if (i<dim) { outliers+=weight; return; }
     std::valarray<long> minp(dim), maxp(dim); minp=0; maxp=0;
     double outs=1.;
-    //lower boundary of nonzero region
+    //boundaries of nonzero region (only accumulate over nonzero regions)
     for (i=0; i<dim; ++i)
     {
         int j;
         for (j=0; j<nbin[i] && tbins[i][j]==0.;) ++j;
         if (j==nbin[i]) { outliers+=weight; return; }
         minp[i]=j;
-        for (;j<nbin[i]&&tbins[i][j]!=0.;) ++j;
+        if (minp[i]==0 && opts[i].walls==HGBPeriodic) j=nbin[i];  //Take care of nonzero kernels wrapping over the periodic boundary
+        else for (;j<nbin[i]&&tbins[i][j]!=0.;) ++j;
         maxp[i]=j;
     }
     std::valarray<long> cp(minp);
@@ -522,15 +727,18 @@ void NDHistogram<U>::add(const std::valarray<U>& nel, double weight)
         int j;
 
         long k=c2b(cp);
-        //for (i=0; i<dim; ++i) std::cerr<<cp[i]<<" ";
-        //std::cerr<<std::endl;
         double tv=1.; for (i=0; i<dim; ++i) tv*=tbins[i][cp[i]];
         bins[k]+=tv/vols[k]*weight;
-        outs-=tv;//*vols[k];
+        outs-=tv;
+
         cp[0]++;
-        for (i=0; i<dim-1; ++i) if (cp[i]>=maxp[i]) {cp[i]=minp[i]; ++cp[i+1];}
+        for (i=0; i<dim-1; ++i)
+        {
+            // in periodic binning, we can at least try to skip zero ranges here
+            if (opts[i].walls==HGBPeriodic) while(cp[i]<maxp[i] && tbins[i][cp[i]] == 0.0) cp[i]++;
+            if (cp[i]>=maxp[i]) {cp[i]=minp[i]; ++cp[i+1];}
+        }
     }
-    //std::cerr<<"outliers: "<<outs<<"\n";
     outliers+=outs*weight;
 }
 
