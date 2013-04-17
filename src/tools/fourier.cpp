@@ -28,12 +28,13 @@ int main(int argc, char ** argv)
    double dt=1.0; 
    unsigned long npad=0;
    std::string wnd;
-   
+   bool fhelp;
    bool fok=clp.getoption(dt, "dt", 1.0) &
+            clp.getoption(fhelp, "h", false) &
             clp.getoption(npad, "pad", (unsigned long) 0) &   
             clp.getoption(wnd, "win", std::string(""));
    
-   if (!fok) { banner(); return -1; }
+   if (!fok || fhelp) { banner(); return -1; }
    
    std::vector<double> data(0); double y;
    // fills up the time series array from stdin 

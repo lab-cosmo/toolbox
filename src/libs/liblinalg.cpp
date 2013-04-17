@@ -1,13 +1,13 @@
 /* A collection of LAPACK wrappers for FMatrix
    --------------------------------------------------
    Author: Michele Ceriotti, 2008
-   Distributed under the GNU General Public License  
+   Distributed under the GNU General Public License
 */
-   
-   
+
+
 #include "linalg.hpp"
 using namespace tblapack;
-
+#include "matrix-io.hpp"
 namespace toolbox {
 void LinearSystem(const FMatrix<double>& A, const std::valarray<double>& b, std::valarray<double>& x)
 {
@@ -23,14 +23,14 @@ void LinearSystem(const FMatrix<double>& A, const std::valarray<double>& b, std:
     int ilap=tblapack::dgesv(&n,&nrhs,&AT(0,0),&n,&ipiv[0],&x[0],&n,&info);
     if (info!=0) {std::cerr<<"LAPACK ERROR "<<info<<"\n"; ERROR("Error in dgesv call");}
 }
-        
+
 //solver for symmetric matrix!!!
 void EigenSolverSym(const FMatrix<double>& A, FMatrix<double>& Q, std::valarray<double>& q, LAEigenMode emode, double vmin, double vmax)
 {
     unsigned long n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
-    
-    if (emode==LAEMAll) 
+
+    if (emode==LAEMAll)
     {
         char JOBZ='V', UPLO='U';
         int N=n, LDA=n, LWORK=100*n, INFO;
@@ -49,7 +49,7 @@ void EigenSolverSym(const FMatrix<double>& A, FMatrix<double>& Q, std::valarray<
         std::valarray<int> IFAIL(n), IWORK(5*n);
         std::valarray<double> WORK(LWORK), lq(n);
         toolbox::FMatrix<double> lA(A), Z(n,n);
-        
+
         tblapack::dsyevx(&JOBZ,&RANGE,&UPLO,&N,
                           &(lA(0,0)),&LDA,&VL,&VU,&IL,&IU,
                             &ABTOL, &NFOUND, &(lq[0]), &Z(0,0),
@@ -59,7 +59,7 @@ void EigenSolverSym(const FMatrix<double>& A, FMatrix<double>& Q, std::valarray<
         Q.resize(n,NFOUND); q.resize(NFOUND);
         for (unsigned long i=0; i<NFOUND; ++i)
         { q[i]=lq[i];    for (unsigned long j=0; j<n; ++j) Q(j,i)=Z(i,j); }
-        
+
     }
 }
 
@@ -69,7 +69,7 @@ void StabCholesky(const toolbox::FMatrix<double>& MMt, toolbox::FMatrix<double>&
     //"stabilized" cholesky which can handle blocks of zeroes and zeroes out negative "eigenvalues"
     unsigned long n=MMt.rows();
     if (MMt.cols()!=n) ERROR("Argument should be a square matrix\n");
-    
+
     FMatrix<double> L(n,n), D(n,n);
     D*=0.; L*=0.;
     unsigned long i,j,k;
@@ -88,7 +88,7 @@ void StabCholesky(const toolbox::FMatrix<double>& MMt, toolbox::FMatrix<double>&
     //FMatrix<double> LT(n,n), R(n,n);
     //transpose(L,LT);
     //mult(L,D,R); mult(R,LT,M); M-=MMt;
-    
+
     for(i=0; i<n; ++i) D(i,i)=(D(i,i)>0.?sqrt(D(i,i)):0.);
     mult(L,D,M);
 }
@@ -97,7 +97,7 @@ void Cholesky(const toolbox::FMatrix<double>& MMt, toolbox::FMatrix<double>& M)
 {
     unsigned long n=MMt.rows();
     if (MMt.cols()!=n) ERROR("Argument should be a square matrix\n");
-    
+
     M.resize(n,n); M*=0.;
     M(0,0)=sqrt(MMt(0,0));
     unsigned long i,j,k;
@@ -122,7 +122,7 @@ void MatrixFunctionSym(const FMatrix<double>& A,  double (*f) (double), FMatrix<
     FMatrix<double> W, WT; std::valarray<double> v;
     EigenSolverSym(A,W,v);
     transpose(W,WT);
-    for(int i=0; i<n; ++i) 
+    for(int i=0; i<n; ++i)
     {
         v[i]=f(v[i]);
         for(int j=0; j<n; ++j) WT(i,j)*=v[i];
@@ -136,16 +136,16 @@ void MatrixFunction(const FMatrix<double>& A,  tblapack::complex (*f) (tblapack:
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
     FMatrix<tblapack::complex> W, W1, CA; std::valarray<complex> v;
     EigenDecomposition(A,W,W1,v);
-    
-    for(int i=0; i<n; ++i) 
+
+    for(int i=0; i<n; ++i)
     {
         v[i]=f(v[i]);
         for(int j=0; j<n; ++j) W1(i,j)*=v[i];
     }
     mult(W,W1,CA);
     FA.resize(n,n);
-    for(int i=0; i<n; ++i) 
-        for(int j=0; j<n; ++j) 
+    for(int i=0; i<n; ++i)
+        for(int j=0; j<n; ++j)
             FA(i,j)=CA(i,j).real();
 }
 
@@ -154,25 +154,25 @@ void MatrixInverse(const FMatrix<double>& A, FMatrix<double>& IA)
     int n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
     FMatrix<double> lA; transpose(A,lA);  //accounts for storage of FORTRAN in col-major
-    std::valarray<int> ipiv(n); 
+    std::valarray<int> ipiv(n);
     int info;
     tblapack::dgetrf(&n,&n,&lA(0,0),&n,&ipiv[0],&info);
     if (info!=0) ERROR("Error "<<info<<" in call to dgetrf.");
-    
+
     int lwork=-1; std::valarray<double> work(n);
     tblapack::dgetri(&n,&lA(0,0),&n,&ipiv[0],&work[0],&lwork,&info);
     if (info!=0) ERROR("Error "<<info<<" in call to dgetri.");
-    
+
     lwork=(int)work[0]; work.resize(lwork);
     tblapack::dgetri(&n,&lA(0,0),&n,&ipiv[0],&work[0],&lwork,&info);
     if (info!=0) ERROR("Error "<<info<<" in call to dgetri.");
-    
+
     transpose(lA,IA); //once again FORT -> C conversion
 }
 
 void EigenDecomposition(const FMatrix<tblapack::complex>& A, FMatrix<tblapack::complex>& O, FMatrix<tblapack::complex>& O1, std::valarray<tblapack::complex>& q)
 {
-    
+
     int n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
     //finds O and D=diag(q) such that A=O D O1
@@ -190,13 +190,13 @@ void EigenDecomposition(const FMatrix<tblapack::complex>& A, FMatrix<tblapack::c
 void SVDecomposition(const FMatrix<double>& A, FMatrix<double>& U, FMatrix<double>& VT, std::valarray<double>& s)
 {
     FMatrix<double> AT; transpose(A,AT);
-    
+
   // Create column and row information on the matrix
     int nsv, nrows, ncols, info; nrows=A.rows(); ncols=A.cols();
     if(nrows>ncols){nsv=ncols;}else{nsv=nrows;}
 
   // Create some containers for stuff from single value decomposition
-    s.resize(nsv); 
+    s.resize(nsv);
     FMatrix<double> UT(nrows,nrows);
     FMatrix<double> V(ncols,ncols);
 
@@ -216,27 +216,27 @@ void SVDecomposition(const FMatrix<double>& A, FMatrix<double>& U, FMatrix<doubl
 
     transpose(UT,U); transpose(V,VT);
 }
-        
+
 void PseudoInverse(const FMatrix<double>& A, FMatrix<double>& IA)
 {
     FMatrix<double> U, VT; std::valarray<double> s;
     SVDecomposition(A,U,VT,s);
-    
+
     unsigned long nsv=s.size();
     // Compute the tolerance on the singular values ( machine epsilon * nsv * maximum singular value )
     double tol=s.max();
     tol*=nsv*1.11E-16; //machine precision
-    
+
     // Get the inverses of the singlular values
-    FMatrix<double> IS( A.rows() , A.cols(), 0.0); 
-    
+    FMatrix<double> IS( A.rows() , A.cols(), 0.0);
+
     for(unsigned long i=0;i<nsv;++i){ if( s[i]>tol ){ IS(i,i)=1./s[i]; }else{ IS(i,i)=0.0; } }
 
   // And now compute the psedoinverse
     FMatrix<double> tmp; //, V, UT;
-    //transpose(VT,V); transpose(U,UT);    
+    //transpose(VT,V); transpose(U,UT);
     mult(U,IS,tmp); mult(tmp,VT,IS);  transpose(IS,IA);
-    
+
     //CHECK
     //mult(A,IA,tmp); mult(tmp,A,IS); IS-=A; std::cerr<<"PSEUDO ERRR " <<normfrob(IS)<<"\n";
 }
@@ -249,10 +249,10 @@ void PseudoInverse(const FMatrix<double>& A, FMatrix<double>& IA)
 ************************************************************/
 void EigenSolver(const FMatrix<complex>& A, FMatrix<complex>& RQ, FMatrix<complex>& LQ, std::valarray<complex>& q)
 {
-    
+
     int n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
-    
+
     char jobvl='V', jobvr='V';
     int lda=n, ldvr=n, ldvl=n;
     std::valarray<complex> work(n);
@@ -261,22 +261,22 @@ void EigenSolver(const FMatrix<complex>& A, FMatrix<complex>& RQ, FMatrix<comple
     std::valarray<double> rwork(2*n);
     FMatrix<complex> vr(n,n), vl(n,n);
     q.resize(n);
-    
+
     int info, lwork=-1;
     //here we only get the size of the work array
     tblapack::zgeev(&jobvl, &jobvr, &n, &(la(0,0)),
                      &lda, &q[0], &(vl(0,0)), &ldvl,
-                                    &(vr(0,0)), &ldvr, &work[0], &lwork, 
+                                    &(vr(0,0)), &ldvr, &work[0], &lwork,
                                       &rwork[0], &info);
-    if (info!=0) 
+    if (info!=0)
         ERROR("Error in cgeev: error code: "<<info);
     lwork=(int) real(work[0]);  work.resize(lwork);
-    
+
     tblapack::zgeev(&jobvl, &jobvr, &n, &la(0,0),
                      &lda, &q[0], &vl(0,0), &ldvl,
-                                      &vr(0,0), &ldvr, &work[0], &lwork, 
+                                      &vr(0,0), &ldvr, &work[0], &lwork,
                                           &rwork[0], &info);
-    if (info!=0) 
+    if (info!=0)
         ERROR("Error in cgeev: error code: "<<info);
     transpose(vr, RQ);
     LQ=vl; toolbox::map(LQ,conj);
@@ -293,26 +293,26 @@ void EigenSolver(const FMatrix<double>& A, FMatrix<complex>& RQ, FMatrix<complex
     //std::cerr<<"real eigensolver\n";
     int n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
-    
+
     char jobvl='V', jobvr='V';
     int lda=n, ldvr=n, ldvl=n;
     std::valarray<double> work(n), wr(n), wi(n);
     FMatrix<double> la;
     transpose(A,la);
     FMatrix<double> vr(n,n), vl(n,n);
-    
+
     int info, lwork=-1;
     //here we only get the size of the work array
     tblapack::dgeev(&jobvl, &jobvr, &n, &(la(0,0)),
                      &lda, &wr[0], &wi[0], &(vl(0,0)), &ldvl,
                     &(vr(0,0)), &ldvr, &work[0], &lwork, &info);
-    if (info!=0) 
+    if (info!=0)
         ERROR("Error in cgeev: error code: "<<info);
     lwork=(int) work[0];  work.resize(lwork);
     tblapack::dgeev(&jobvl, &jobvr, &n, &(la(0,0)),
                     &lda, &wr[0], &wi[0], &(vl(0,0)), &ldvl,
                     &(vr(0,0)), &ldvr, &work[0], &lwork, &info);
-    if (info!=0) 
+    if (info!=0)
         ERROR("Error in cgeev: error code: "<<info);
     //now, lines of vr contains eigenvectors, with splitted real/imag part. we must put them together
     q.resize(n); RQ.resize(n,n); RQ*=0.; LQ=RQ;
@@ -322,14 +322,14 @@ void EigenSolver(const FMatrix<double>& A, FMatrix<complex>& RQ, FMatrix<complex
         if(wi[i]==0.)
         {
             //real eigenvalue!
-            for(unsigned long j=0; j<n; ++j) 
+            for(unsigned long j=0; j<n; ++j)
             { RQ(j,i)=complex(vr(i,j),0.); LQ(i,j)=complex(vl(i,j),0.); }
         }
         else
         {
             q[i+1]=complex(wr[i],-wi[i]);
-            for(unsigned long j=0; j<n; ++j) 
-            { RQ(j,i)=complex(vr(i,j),vr(i+1,j)); RQ(j,i+1)=complex(vr(i,j),-vr(i+1,j));  
+            for(unsigned long j=0; j<n; ++j)
+            { RQ(j,i)=complex(vr(i,j),vr(i+1,j)); RQ(j,i+1)=complex(vr(i,j),-vr(i+1,j));
               LQ(i,j)=complex(vl(i,j),-vl(i+1,j)); LQ(i+1,j)=complex(vl(i,j),vl(i+1,j)); }
             ++i;
         }
@@ -338,14 +338,14 @@ void EigenSolver(const FMatrix<double>& A, FMatrix<complex>& RQ, FMatrix<complex
 
 void EigenDecomposition(const FMatrix<double>& A, FMatrix<tblapack::complex>& O, FMatrix<tblapack::complex>& O1, std::valarray<tblapack::complex>& q)
 {
-    
+
     int n=A.rows();
     if (A.cols()!=n) ERROR("Argument should be a square matrix\n");
     //finds O and D=diag(q) such that A=O D O1
     EigenSolver(A, O, O1, q);
     //almost there: we only need to renormalize O (which contains now right eigv) and O1 (which contains left eigv)
     std::valarray<complex> w(n); w=0.;
-    
+
     for (int i=0; i<n; ++i)
     {
         for (int j=0; j<n; ++j) w[i]+=O1(i,j)*O(j,i);
@@ -354,5 +354,44 @@ void EigenDecomposition(const FMatrix<double>& A, FMatrix<tblapack::complex>& O,
     for (int i=0; i<n; ++i) for (int j=0; j<n; ++j) { O1(i,j)*=w[i]; }
 }
 
+// TRIES TO TRANSFORM THE MATRIX IN A BLOCK DIAGONAL FORM. EXPERIMENTAL!!!
+// should yield a decomposition where A=O.B.O1, where B is diagonal or has 2x2 blocks corresponding to complex eigenvalues
+void EigenBlock(const FMatrix<double>& A, FMatrix<double>& O, FMatrix<double>& O1, FMatrix<double>& B)
+{
+    unsigned long n=A.rows();
+    FMatrix<tblapack::complex> cO, cO1; std::valarray<tblapack::complex> q;
+    EigenDecomposition(A, cO, cO1, q);
+
+    //computes swaps (eigenvalues should come sorted by decreasing modulus)
+    int i,j, iswp;
+    std::valarray<int> pp(n); for (i=0; i<n; i++) pp[i]=i;
+    for (i=0; i<n; i++) for (j=i+1; j<n; ++j)
+        if (std::abs(q[pp[j]])>std::abs(q[pp[i]])) { iswp=pp[j]; pp[j]=pp[i]; pp[i]=iswp; }
+
+    B.resize(n,n); B*=0.0;
+    O.resize(n,n); O1.resize(n,n);
+    for (j=0; j<n; j++)
+    {
+
+        if (j==n-1||(fabs(std::real(q[pp[j]])-std::real(q[pp[j+1]]))>
+             fabs( std::imag(q[pp[j]])-std::imag(q[pp[j+1]]) )))   // real eigenvalue heuristics
+        {
+
+            B(j,j)=std::real(q[pp[j]]);
+            for (i=0; i<n; i++) O(i,j)=std::real(cO(i,pp[j]));
+            for (i=0; i<n; i++) O1(j,i)=std::real(cO1(pp[j],i));
+        }
+        else  //complex eigenvalue
+        {
+            B(j,j)=B(j+1,j+1)=std::real(q[pp[j]]);
+            B(j+1,j)=-(B(j,j+1)=std::imag(q[pp[j]]));
+            for (i=0; i<n; i++) O(i,j)  =std::real(cO(i,pp[j]))*constant::sqrt2;
+            for (i=0; i<n; i++) O(i,j+1)=std::imag(cO(i,pp[j]))*constant::sqrt2;
+            for (i=0; i<n; i++) O1(j,i)  =std::real(cO1(pp[j],i))*constant::sqrt2;
+            for (i=0; i<n; i++) O1(j+1,i)=-std::imag(cO1(pp[j],i))*constant::sqrt2;
+            ++j;
+        }
+    }
+}
 }; //ends namespace toolbox
 
