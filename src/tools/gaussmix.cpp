@@ -1,6 +1,7 @@
 #include "tbdefs.hpp"
 #include "matrix-full.hpp"
 #include "matrix-io.hpp"
+#include "rndgen.hpp"
 #include "linalg.hpp"
 #include "clparser.hpp"
 #include <iostream>
@@ -52,40 +53,51 @@ public:
     { return exp(lp(x)); }
 };
 
+void banner()
+{
+    std::cerr
+            << " USAGE: gaussmix -d dimension [-ng n-gauss]             \n"
+            << "                  [-ns n-iter-opt] [-eps tolerance] [-s smoothing]             \n"
+            << "                 -h < INPUT > OUTPUT                                      \n"
+            << " performs a gaussian mixture clustering of a set of input data points.          \n";
+}
+
 int main(int argc, char** argv)
 {
     CLParser clp(argc,argv);
     
-    unsigned long kgm, mxstep, ne, nd;
+    unsigned long kgm, mxstep, ne, nd, seed;
     //reads input presented on stdin in full-matrix form
     FMatrix<double> rdata;
     double eps, smooth;
     bool fhelp, fok=
+            clp.getoption(ne,"d") &&
             clp.getoption(kgm,"ng",3ul) &&
             clp.getoption(mxstep,"ns",100ul) &&
             clp.getoption(eps,"e",1e-5) &&
             clp.getoption(smooth,"s",0.) &&
+            clp.getoption(seed,"seed",12345ul) &&
             clp.getoption(fhelp,"h",false);
 
-    std::cin>>rdata;
-    nd=rdata.rows(); ne=rdata.cols();
-    //converts data in more handy (?) format
-    std::valarray<std::valarray<double> > vdata(nd);
-    for (int i=0; i<nd; ++i)
-    {
-        vdata[i].resize(ne);
-        for (int j=0; j<ne; ++j)
-            vdata[i][j]=rdata(i,j);
+    if (fhelp) { banner(); return -1; }
+
+    std::valarray<double> val(ne);
+    std::vector<std::valarray<double> > vdata;
+    while (std::cin.good()) {    
+       for (int i=0; i<ne; ++i) std::cin>>val[i];
+       vdata.push_back(val);
     }
-    
+    nd=vdata.size(); 
     
     std::valarray<Gaussian> gauss(kgm); std::valarray<double> lpg(kgm);
     //initializes "randomly" the gaussian data
     FMatrix<double> Ck(ne,ne); std::valarray<double> mk(ne);
+    StdRndUniform rndgen(seed);
     for (int k=0; k<kgm; ++k)
     {
         Ck*=0.; 
-        for (int i=0; i<ne; ++i) { Ck(i,i)=1e-5; mk[i]=1e-5*(k+1)*(i+1); }
+        int icnt=rndgen()*nd;
+        for (int i=0; i<ne; ++i) { Ck(i,i)=1e-5; mk[i]=vdata[icnt][i]; }
         gauss[k].update(mk,Ck);
         lpg[k]=-log(double(kgm));
     }
