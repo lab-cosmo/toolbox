@@ -11,9 +11,10 @@ void banner()
 {
    std::cerr<< " USAGE: fourier [options] < INPUT [ > OUTPUT ]                                  \n"
             << " reads a time series from stdin and computes its Fourier transform by FFT.      \n"
-            << " Input should be just the time series, without headers or time code.            \n"
-            << " Data can be interpreted in different ways, depending to the options given:     \n"
-            << " @@@@@@@@@@@@@@@@@@@@@ DEFINE DIFFERENT BEHAVIOURS @@@@@@@@@@@@@@@@@@@@@@@      \n"
+            << " Input should be just the time series, without headers or time code.            \n"           
+            << " Data is interpreted as a sequence of points in time, spaced by an interval dt  \n"
+            << " and starting from t=0. The FT is performed considering the function to be an   \n"
+            << " even function of time, so it yields sqrt(2/pi)\int_0^\infty f(t) dt            \n"
             << " -dt [dt]    sets the time interval between input samples. {def: 1.0}           \n"
             << " -pad [npad] appends npad zeroes before doing the FT. increases the resolution. \n"
             << " -win [wnd]  applies a windowing function to the data before FT.                \n"
@@ -67,7 +68,7 @@ int main(int argc, char ** argv)
    fftw_execute(r2rplan);        
    
    // fixes the normalization
-   vvw*=dt/(2.*constant::pi);
+   vvw*=dt/sqrt(2.*constant::pi);
    double dw=constant::pi/(dt*(nfft-1));
 
    // very terse output

@@ -59,7 +59,7 @@ void banner()
     std::cerr
             << " USAGE: gaussmix -d dimension [-ng n-gauss]             \n"
             << "                  [-ns n-iter-opt] [-eps tolerance] [-s smoothing] [-init file]  \n"
-            << "                 -h < INPUT > OUTPUT                                      \n"
+            << "                  [-v] [-h] < INPUT > OUTPUT                                      \n"
             << " performs a gaussian mixture clustering of a set of input data points.          \n";
 }
 
@@ -71,7 +71,7 @@ int main(int argc, char** argv)
     //reads input presented on stdin in full-matrix form
     FMatrix<double> rdata; std::string filein;
     double eps, smooth;
-    bool fhelp, fok=
+    bool fhelp, fverb, fok=
             clp.getoption(ne,"d") &&
             clp.getoption(kgm,"ng",3ul) &&
             clp.getoption(mxstep,"ns",100ul) &&
@@ -79,6 +79,7 @@ int main(int argc, char** argv)
             clp.getoption(smooth,"s",0.) &&
             clp.getoption(seed,"seed",12345ul) &&
             clp.getoption(filein,"init",std::string("")) &&
+            clp.getoption(fverb,"v",false) &&
             clp.getoption(fhelp,"h",false);
 
     if (fhelp) { banner(); return -1; }
@@ -108,8 +109,9 @@ int main(int argc, char** argv)
         std::ifstream fip(filein.c_str());
         for (unsigned long i=0; i<kgm; i++)
         {
-            gauss[i].getpars(mk,Ck);
             for (unsigned long j=0; j<ne; j++) fip>>mk[j];
+            for (unsigned long j=0; j<ne; j++) for (unsigned long k=0; k<ne; k++) fip>>Ck(j,k);
+            fip>>lpg[i];
             gauss[i].update(mk,Ck);
         }
     }
@@ -165,17 +167,34 @@ int main(int argc, char** argv)
             gauss[k].update(mk,Ck);
         }
     }
-    std::cout<<"# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # \n";
-    std::cout<<"# Gaussian mixture clustering report\n# Log-likelihood: "<<llike<<"\n";
-    std::cout<<"# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # \n";
-    for (int k=0; k<kgm; ++k)
+
+    std::cout<<std::scientific; std::cout.precision(10);
+    if (fverb)
     {
-        std::cout<<"# * Gaussian cluster n. "<<k<<"  lig-like: "<<lpg[k]<<std::endl;
-        gauss[k].getpars(mk,Ck);
-        std::cout<<"# Mean: \n";
-        for (int i=0; i<ne; ++i) std::cout<<mk[i]<<" ";
-        std::cout<<"\n# Covariance: \n";
-        for (int i=0; i<ne; ++i) { for (int j=0; j<ne; ++j) std::cout<<Ck(i,j)<<" "; std::cout<<std::endl; }
-    }
-    return 0;
+       std::cout<<"# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # \n";
+       std::cout<<"# Gaussian mixture clustering report\n# Log-likelihood: "<<llike<<"\n";
+       std::cout<<"# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # \n";
+       for (int k=0; k<kgm; ++k)
+       {
+           std::cout<<"# * Gaussian cluster n. "<<k<<"  lig-like: "<<lpg[k]<<std::endl;
+           gauss[k].getpars(mk,Ck);
+           std::cout<<"# Mean: \n";
+           for (int i=0; i<ne; ++i) std::cout<<mk[i]<<" ";
+           std::cout<<"\n# Covariance: \n";
+           for (int i=0; i<ne; ++i) { for (int j=0; j<ne; ++j) std::cout<<Ck(i,j)<<" "; std::cout<<std::endl; }
+       }
+   } 
+   else
+   {
+      //compact output
+      for (int k=0; k<kgm; ++k)
+      {
+         gauss[k].getpars(mk,Ck);
+         for (int i=0; i<ne; ++i) std::cout<<mk[i]<<" ";
+         for (int i=0; i<ne; ++i) for (int j=0; j<ne; ++j) std::cout<<Ck(i,j)<<" ";
+         std::cout<<lpg[k]<<" "<<std::endl;
+      }    
+
+   }
+   return 0;
 }

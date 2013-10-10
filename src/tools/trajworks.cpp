@@ -396,7 +396,7 @@ int main(int argc, char **argv)
             clp.getoption(shwin,"hwin",std::string("delta")) &&
             clp.getoption(hwinfac,"hwinfac",1.) &&
             //g(r) options
-            clp.getoption(fgdr,"gr",false) &&
+            clp.getoption(fgdr,"gr",false) &&            
             clp.getoption(lgdr1,"gr1",std::string("*")) &&
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
@@ -481,9 +481,9 @@ int main(int argc, char **argv)
     hgdr.get_options(hgwo); hgwo.window=hwin;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hgdr.set_options(hgwo);
 
-    double d12, dx, dy, dz, cog2=cogdr*cogdr;
+    double d12, dx, dy, dz, cog2=cogdr*cogdr, ngdrpairs=0;
     int nfr=0, npfr=0;
-
+    
     //velocity-velocity correlation stuff
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
 
@@ -729,8 +729,9 @@ int main(int argc, char **argv)
             }
             else if (fdlp) { af2cm(af,CM); }
             MatrixInverse(CM,ICM);
-            cvolume=fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
-                    CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0));
+            //updates the average volume
+            cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
+                    CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0)) - cvolume)/npfr ;
         }
 
         if (funwrap)
@@ -1146,6 +1147,7 @@ int main(int argc, char **argv)
                 if (d12>cog2||d12==0.) continue;
                 hgdr<<sqrt(d12);
             }
+            ngdrpairs+=al1.size()*al2.size();   // potential number of pairs in the cell volume
         }
         if (fvvac)
         {
@@ -1242,6 +1244,7 @@ int main(int argc, char **argv)
 
     if (fgdr)
     {
+        
         std::cerr<<"# PRINTING OUT g(r) FOR "<<lgdr1<<" - "<<lgdr2<<" PAIR\n";
         std::valarray<double> r, w, gr;
         hgdr.get_bins(r, w, gr);
@@ -1249,7 +1252,7 @@ int main(int argc, char **argv)
         { gr[i]=gr[i]/(4*constant::pi*r[i]*r[i]); }
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
-        else gr*=hgdr.samples()/(npfr*al1.size()*al2.size()/cvolume);
+        else gr*=hgdr.samples()/(ngdrpairs/cvolume);
         for (unsigned long i=0; i<r.size(); ++i)
             (*ogdr)<<r[i]<<" "<<gr[i]<<std::endl;
     }

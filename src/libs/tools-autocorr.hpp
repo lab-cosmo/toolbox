@@ -293,7 +293,7 @@ void AutoCorrelation<U>::mkacf()
         double v;
         
         //here we compute acf of different series, and average them according to the 
-            //length of the series themselves
+        //length of the series themselves
         double nsmp=0;
         for (unsigned long s=0; s<p_nseries; ++s)
         if (serieslengths[s]>p_ncorr) //only series contributing meaningful data are considered
