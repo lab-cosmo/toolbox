@@ -1223,7 +1223,12 @@ int main(int argc, char **argv)
                 micpbc(1.,1.,1.,dx,dy,dz);
                 micmat(CM,dx,dy,dz);
                 */
-
+                // hard-coded atomic charges
+                if (af.ats[i].nprops.count("charge") ==0)
+                {
+                   if (af.ats[i].name == "H") af.ats[i].nprops["charge"]=1.0;
+                   if (af.ats[i].name == "O") af.ats[i].nprops["charge"]=-2.0;
+                } 
                 dip_cur.x+=dx*af.ats[i].nprops["charge"];
                 dip_cur.y+=dy*af.ats[i].nprops["charge"];
                 dip_cur.z+=dz*af.ats[i].nprops["charge"];
