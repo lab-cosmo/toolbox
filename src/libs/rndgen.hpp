@@ -59,6 +59,7 @@ public:
     //constructors
     StdRndUniform(const status_type& init=0) { srand48(init); pstate=0; }
     StdRndUniform(const StdRndUniform& ru) { setstatus(ru.pstate);}
+    void seed(const status_type& seed) { srand48(seed); pstate=0; }
     
     StdRndUniform& operator=(const StdRndUniform& ru) { setstatus(ru.pstate); return *this; }    
     inline rnd_type operator() () { return extract(); }
@@ -180,6 +181,7 @@ public:
     void getstatus(status_type& state) const { state=pstate; }
     void setstatus(const status_type& nstat) { pstate=nstat; rugen.setstatus(nstat.rustate); }
     void setpars(const RGPars<U>& npars) { pstate.pars=npars; }
+    void seed(const unsigned long& seed=4537) { rugen.seed(seed); }
     
     U mean() {return pstate.pars.mean; }
     U sigma() {return pstate.pars.sigma; }
