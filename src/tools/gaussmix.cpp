@@ -9,34 +9,46 @@
 
 using namespace toolbox;
 
+/* A simple class to compute a multivariate Gaussian probability distribution */
+
 class Gaussian {
 private:
-    int sz;
-    std::valarray<double> m;
-    FMatrix<double> C, iC; 
-    double ldet;
-    
+    int sz;                   // the dimensionality of the Gaussian
+    std::valarray<double> m;  // the mean
+    FMatrix<double> C, iC;    // the covariance matrix and its inverse
+    double ldet;              // logarithm of the determinant of C (for the normalization)
+    double lpi;               // extra constant entering the normalization
 public:
+    // constructor
     Gaussian(int nsz=0): sz(nsz), C(nsz,nsz), m(nsz) {};
-    
+
+
+    // sets the parameters for the evaluation of the Gaussian PDF
     void update(const std::valarray<double>& nm, const FMatrix<double>& nC)
     {
+        // resizes the private arrays
         if (nm.size()!=nC.rows() || nm.size()!=nC.cols()) ERROR("Size mismatch in given parameters");
         sz=nm.size();
         m.resize(sz); m=nm;
         C.resize(sz,sz); C=nC;
-        //it would be much better to use cholesky instead. TODO 
-        MatrixInverse(C,iC);
+
+
+        // computes intermediate values that are handy to compute the PDF
+        // inverse covariance matrix
+        MatrixInverse(C,iC);  // it would be much better to use cholesky instead. TODO
         FMatrix<double> Q; std::valarray<double> q;
-        EigenSolverSym(C,Q,q);
+        EigenSolverSym(C,Q,q);  // computes the determinant the silly way
         ldet=0.; for (int i=0; i<sz; ++i) ldet+=log(q[i]>0.?q[i]:1e-100);
+        lpi=-log(2.*constant::pi)*double(sz)*0.5;  // the other constant in the normalization
     }
-    
+
+    // gets the parameters of the Gaussian PDF
     void getpars(std::valarray<double>& nm, FMatrix<double>& nC) const
     {
         nm.resize(sz); nm=m; nC=C;
     }
-    
+
+    // computes the log of the PDF evaluated at x
     double lp(const std::valarray<double>& x) const
     {
         if (x.size()!=sz) ERROR("Size mismatch in given vector");
@@ -44,12 +56,13 @@ public:
         y-=m;
         for (int i=0; i<sz; ++i) for (int j=0; j<sz; ++j) rv+=iC(i,j)*y[i]*y[j];
         rv*=-0.5;
-        rv+=-log(2.*constant::pi)*double(sz)/2.;
+        rv+=lpi;
         rv+=-0.5*ldet;
-        
+
         return rv;
     }
-    
+
+    // computes the PDF evaluated at x
     double p(const std::valarray<double>& x) const
     { return exp(lp(x)); }
 };
@@ -60,21 +73,25 @@ void banner()
             << " USAGE: gaussmix -d dimension [-ng n-gauss]             \n"
             << "                  [-ns n-iter-opt] [-eps tolerance] [-s smoothing] [-init file]  \n"
             << "                  [-v] [-h] < INPUT > OUTPUT                                      \n"
-            << " performs a gaussian mixture clustering of a set of input data points.          \n";
+            << " performs a gaussian mixture clustering of a set of input data points,          \n"
+            << " given on stdin as x11 x12 x13 ... x1d x21 x22 ... x2d                         \n"
+            << " -d specifies the dimensionality of the input points                            \n"
+            << " -ng specifies the number of Gaussian clusters in the mixture                   \n"
+            ;
 }
 
 int main(int argc, char** argv)
 {
     CLParser clp(argc,argv);
-    
+
     unsigned long kgm, mxstep, ne, nd, seed;
     //reads input presented on stdin in full-matrix form
     FMatrix<double> rdata; std::string filein;
     double eps, smooth;
     bool fhelp, fverb, fok=
-            clp.getoption(ne,"d") &&
-            clp.getoption(kgm,"ng",3ul) &&
-            clp.getoption(mxstep,"ns",100ul) &&
+            clp.getoption(ne,"d") &&               // dimensionality of the input data
+            clp.getoption(kgm,"ng",3ul) &&         // number of Gaussian clusters
+            clp.getoption(mxstep,"ns",100ul) &&    // number of EM steps
             clp.getoption(eps,"e",1e-5) &&
             clp.getoption(smooth,"s",0.) &&
             clp.getoption(seed,"seed",12345ul) &&
@@ -84,27 +101,33 @@ int main(int argc, char** argv)
 
     if (fhelp) { banner(); return -1; }
 
+    // reads data points from stdin and stores them in vdata
     std::valarray<double> val(ne);
-    std::vector<std::valarray<double> > vdata;
-    while (std::cin.good()) {    
+    std::vector< std::valarray<double> > vdata;
+    while (std::cin.good()) {
        for (int i=0; i<ne; ++i) std::cin>>val[i];
        vdata.push_back(val);
     }
-    nd=vdata.size(); 
-    
-    std::valarray<Gaussian> gauss(kgm); std::valarray<double> lpg(kgm);
+    nd=vdata.size();  // number of data points
+
+    std::valarray<Gaussian> gauss(kgm);     // makes kgm Gaussian classes (to compute the cluster probabilities)
+    std::valarray<double> lpg(kgm);         // these are the log-weight of
+
     //initializes "randomly" the gaussian data
     FMatrix<double> Ck(ne,ne); std::valarray<double> mk(ne);
     StdRndUniform rndgen(seed);
     for (int k=0; k<kgm; ++k)
     {
-        Ck*=0.; 
+        Ck*=0.;
         int icnt=rndgen()*nd;
         for (int i=0; i<ne; ++i) { Ck(i,i)=1e-5; mk[i]=vdata[icnt][i]; }
         gauss[k].update(mk,Ck);
-        lpg[k]=-log(double(kgm));
+        lpg[k]=-log(double(kgm));   // each cluster has a weight 1/kgm
     }
-    if (filein!="")
+
+
+    // restarts from file
+    if (filein!="") //!TODO CLEAN UP MAKING CONSISTENT WITH THE OUTPUT
     {
         std::ifstream fip(filein.c_str());
         for (unsigned long i=0; i<kgm; i++)
@@ -123,27 +146,29 @@ int main(int argc, char** argv)
         //E step
         //first, gets unnormalized logs of pnk
         for (int i=0; i<nd; ++i)
-        for (int k=0; k<kgm; ++k)
-        { lpnk(i,k)=gauss[k].lp(vdata[i])+lpg[k]; }
-        
-        
+          for (int k=0; k<kgm; ++k)
+          { lpnk(i,k)=gauss[k].lp(vdata[i])+lpg[k]; }
+
         //then, normalizes logs
         llike=0.;
         for (int i=0; i<nd; ++i)
-        { 
+        {
             double mxl, sume, lpnorm;
+            // finds the largest Gaussian weight for point i
             mxl=lpnk(i,0); for (int k=1; k<kgm; ++k) if (lpnk(i,k)>mxl) mxl=lpnk(i,k);
-            sume=0.; for (int k=0; k<kgm; ++k) sume+=exp(lpnk(i,k)-mxl);
-            //std::cerr<<"mxk, sume"<<mxl<<":"<<sume<<"\n";
+            sume=0.; for (int k=0; k<kgm; ++k) sume+=exp(lpnk(i,k)-mxl);  // computes the total probability relative to the maximum weight, for stability
             lpnorm=mxl+log(sume);
-            for (int k=0; k<kgm; ++k) { lpnk(i,k)-=lpnorm; pnk(i,k)=exp(lpnk(i,k)); }
+
+            for (int k=0; k<kgm; ++k) { lpnk(i,k)-= lpnorm; pnk(i,k)=exp(lpnk(i,k)); }
             sume=0.; for (int k=0; k<kgm; ++k) sume+=pnk(i,k);
-        //    std::cerr<<" tpn " <<sume<<"\n";
+
             llike+=lpnorm;
         }
-       
+
+        // here we have the total log-likelyhood
         std::cerr<<"Log likelihood: "<<llike<<"\n";
-        if (fabs((llike-lolike)/llike)<eps) break;
+        if (fabs((llike-lolike)/llike)<eps) break;   // exits if the log-likelyhood has changed very little
+
         //M step (updates gaussian parameters)
         for (int k=0; k<kgm; ++k)
         {
@@ -153,16 +178,16 @@ int main(int argc, char** argv)
             for (int i=0; i<nd; ++i) mk+=vdata[i]*pnk(i,k);
             mk*=1./tpnk;
             for (int i=0; i<ne; ++i) for (int j=0; j<ne; ++j)
-            { 
-                Ck(i,j)=0.; 
+            {
+                Ck(i,j)=0.;
                 for (int h=0; h<nd; ++h) Ck(i,j)+=pnk(h,k)*(vdata[h][i]-mk[i])*(vdata[h][j]-mk[j]);
-                
+
                 Ck(i,j)*=1./tpnk;
             }
             double ctr=trace(Ck)/ne*smooth;
             Ck*=(1.-smooth);
             for (int i=0; i<ne; ++i) Ck(i,i)+=ctr;
-            
+
             std::cerr<<k<<" "<<lpg[k]<<" "<<mk[0]<<" "<<Ck(0,0)<<"\n";
             gauss[k].update(mk,Ck);
         }
@@ -176,14 +201,14 @@ int main(int argc, char** argv)
        std::cout<<"# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # \n";
        for (int k=0; k<kgm; ++k)
        {
-           std::cout<<"# * Gaussian cluster n. "<<k<<"  lig-like: "<<lpg[k]<<std::endl;
+           std::cout<<"# * Gaussian cluster n. "<<k<<"  log-like: "<<lpg[k]<<std::endl;
            gauss[k].getpars(mk,Ck);
            std::cout<<"# Mean: \n";
            for (int i=0; i<ne; ++i) std::cout<<mk[i]<<" ";
            std::cout<<"\n# Covariance: \n";
            for (int i=0; i<ne; ++i) { for (int j=0; j<ne; ++j) std::cout<<Ck(i,j)<<" "; std::cout<<std::endl; }
        }
-   } 
+   }
    else
    {
       //compact output
@@ -193,7 +218,7 @@ int main(int argc, char** argv)
          for (int i=0; i<ne; ++i) std::cout<<mk[i]<<" ";
          for (int i=0; i<ne; ++i) for (int j=0; j<ne; ++j) std::cout<<Ck(i,j)<<" ";
          std::cout<<lpg[k]<<" "<<std::endl;
-      }    
+      }
 
    }
    return 0;
