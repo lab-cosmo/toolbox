@@ -104,22 +104,23 @@ int main(int argc, char **argv)
             <<std::setw(15)<<AC.actime2()<<"\n";
     if (fshort) return 0;
     std::cout<<"# ^  mean  ^ . ^  sigma ^ . ^   tau  ^ . ^  tau2  ^ .                              \n";
-    std::cout.precision(5);
+    std::cout.precision(7); std::cout.setf(std::ios::scientific);
     std::cout<<"################################################################################\n";
-    std::cout<<"#  autocorrelation function computed from "<<std::setw(10)<<AC.samples()<<" samples                   #\n";
-    std::cout<<"#  computed with time unit:    "<<std::setw(10)<<acopts.timestep<<"                                      #\n";
+    std::cout<<"#  autocorrelation function computed from "<<std::setw(12)<<AC.samples()<<" samples                   #\n";
+    std::cout<<"#  computed with time unit:    "<<std::setw(12)<<acopts.timestep<<"                                      #\n";
     if (acopts.f_exact_mean)
-        std::cout<<"#  computed with exact mean:   "<<std::setw(10)<<acopts.xmean<<"                                      #\n";
+        std::cout<<"#  computed with exact mean:   "<<std::setw(12)<<acopts.xmean<<"                                      #\n";
     if (acopts.f_exact_sigma)
-        std::cout<<"#  computed with exact sigma:  "<<std::setw(10)<<acopts.xsigma<<"                                      #\n";
+        std::cout<<"#  computed with exact sigma:  "<<std::setw(12)<<acopts.xsigma<<"                                      #\n";
     if (acopts.f_exact_tau2)
-        std::cout<<"#  computed with exact tau2:   "<<std::setw(10)<<acopts.xtau2<<"                                      #\n";
+        std::cout<<"#  computed with exact tau2:   "<<std::setw(12)<<acopts.xtau2<<"                                      #\n";
     std::cout<<"# **************************************************************************** #\n";
-    std::cout<<"#  mean:      "<<std::setw(10)<<mean
-            <<" ± "<<std::setw(10)<<(sigma/sqrt(AC.samples()*acopts.timestep*0.5/tau))
+    std::cout<<"#  mean:      "<<std::setw(12)<<mean
+            <<" ± "<<
+                std::setw(12)<<(sigma/sqrt(AC.samples()*acopts.timestep*0.5/tau))
             <<"                                          #\n";
-    std::cout<<"#  sigma:     "<<std::setw(10)<<sigma<<"                                                       #\n";
-    std::cout<<"#  a.c. time: "<<std::setw(10)<<tau<<"                                                       #\n"; 
+    std::cout<<"#  sigma:     "<<std::setw(12)<<sigma<<"                                                       #\n";
+    std::cout<<"#  a.c. time: "<<std::setw(12)<<tau<<"                                                       #\n"; 
     std::cout<<"################################################################################\n";
     std::cout<<"#    time   .     acf    .    Dacf    .    block   .   Dblock   .\n";
     
