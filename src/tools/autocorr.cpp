@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     }
     double mean=AC.mean(), sigma=AC.sigma(), tau=AC.actime();
     std::cout.precision(8); std::cout.setf(std::ios::scientific); 
-    std::cout<<(fshort?"":"#")
+    std::cout<<(fshort?"":"# ")
             <<std::setw(15)<<mean<<" "
             <<std::setw(15)<<sigma<<" "
             <<std::setw(15)<<tau<<" "
