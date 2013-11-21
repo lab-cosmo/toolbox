@@ -318,7 +318,8 @@ void banner()
             << " -vbox     enables variable box (to be read from DLP or sequentially from box)  \n"
             << " -lab file reads atoms labels from file ( lab1 lab2 lab3....  )                 \n"
             << " -hwin     window for all histo (triangle|box|delta|gauss-[1,2,3,5]) [delta]    \n"
-            << " -hwinfac  size of the window, as a function of the interval [1.0]              \n"
+            << " -hwinfac  size of the window, as a function of the bin size [1.0]              \n"
+            << " -weights file read statistical log-weights of frames from an external file     \n"
             << " ## g(r) OPTIONS:   activate by -gr                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
             << " -gr2      label of the second specie [*]                                       \n"
@@ -375,7 +376,7 @@ int main(int argc, char **argv)
     CLParser clp(argc, argv);
 
     bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
-    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv;
+    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
@@ -395,6 +396,7 @@ int main(int argc, char **argv)
             clp.getoption(fvbox,"vbox",false) &&
             clp.getoption(shwin,"hwin",std::string("delta")) &&
             clp.getoption(hwinfac,"hwinfac",1.) &&
+            clp.getoption(fweights,"weights",std::string("")) &&
             //g(r) options
             clp.getoption(fgdr,"gr",false) &&            
             clp.getoption(lgdr1,"gr1",std::string("*")) &&
@@ -478,7 +480,7 @@ int main(int argc, char **argv)
     AtomFrame af; std::vector<AtomData> al1, al2, ldip;
     AtomData dip_tx, dip_cur; double tcharge=0.;
     Histogram<double> hgdr(0.,cogdr, gdrbins);
-    hgdr.get_options(hgwo); hgwo.window=hwin;
+    hgdr.get_options(hgwo); hgwo.window=hwin; hgwo.walls=HGBHard;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hgdr.set_options(hgwo);
 
     double d12, dx, dy, dz, cog2=cogdr*cogdr, ngdrpairs=0;
@@ -657,6 +659,9 @@ int main(int argc, char **argv)
     //cell matrix reading
     std::ifstream ifbox;
     FMatrix<double> CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
+   
+    //weights reading
+    std::ifstream ifweights;
 
     //named selection
     std::vector<unsigned long> denssel, al_denssel, pcasel, al_pcasel, gdrsel,vvacsel;
@@ -674,6 +679,7 @@ int main(int argc, char **argv)
     if(fdlp) { std::getline(std::cin,dummy); std::getline(std::cin,dummy); } //jumps over header
     bool ffirstcell;
     AtomFrame uwframe;
+    double statweight=1.0, stattot=0.0;
     while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
     {
         ++nfr;
@@ -697,8 +703,12 @@ int main(int argc, char **argv)
                 for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CM(j,i);
                 if (!ifbox.good()) ERROR("Format error in box file.");
             }
-            else if (fdlp) { af2cm(af,CM); }
+            else if (fdlp) { af2cm(af,CM); }        
             else fhavecell=false;
+            if (fweights!="")
+            {
+                ifweights.open(fweights.c_str());
+            }
             if (fhavecell)
             {
                 MatrixInverse(CM,ICM);
@@ -733,7 +743,11 @@ int main(int argc, char **argv)
             cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
                     CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0)) - cvolume)/npfr ;
         }
-
+        if (fweights!="")
+        {
+            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
+            if (!ifweights.good()) ERROR("Format error in weights file.");
+        }
         if (funwrap)
         {
             if (uwframe.ats.size()==0) uwframe=af;
@@ -1145,9 +1159,9 @@ int main(int argc, char **argv)
                 if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
                 d12=dx*dx+dy*dy+dz*dz;
                 if (d12>cog2||d12==0.) continue;
-                hgdr<<sqrt(d12);
+                hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
             }
-            ngdrpairs+=al1.size()*al2.size();   // potential number of pairs in the cell volume
+            ngdrpairs+=al1.size()*al2.size()*statweight;   // potential number of pairs in the cell volume
         }
         if (fvvac)
         {
