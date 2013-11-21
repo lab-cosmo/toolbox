@@ -657,8 +657,8 @@ int main(int argc, char **argv)
     rng.RUGenerator().seed(100);
 
     //cell matrix reading
-    std::ifstream ifbox;
-    FMatrix<double> CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
+    std::ifstream ifbox; 
+    FMatrix<double> CBOX(3,3), CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
    
     //weights reading
     std::ifstream ifweights;
@@ -680,35 +680,38 @@ int main(int argc, char **argv)
     bool ffirstcell;
     AtomFrame uwframe;
     double statweight=1.0, stattot=0.0;
+    if (fbox!="") ifbox.open(fbox.c_str());
+    if (fweights!="") ifweights.open(fweights.c_str());
+    ffirstcell=true;    
     while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
     {
         ++nfr;
         if (fstop!=0 && nfr>fstop)  break;
+        // reads anyway box and weights, as they are meant to span the whole trajectory
+        if (fbox!="" and (fvbox || ffirstcell) )
+        { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file."); }
+        if (fweights!="")
+        {
+            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
+            if (!ifweights.good()) ERROR("Format error in weights file.");
+        }
+
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
         { std::cerr<<"Skipping frame "<<nfr<<"\n"; continue; }
+
         std::cerr<<"Processing frame "<<nfr<<"\n";
         if (vlab.size()!=0)
         {
             if (af.ats.size()!=vlab.size()) ERROR("Atom number mismatch at frame"<<nfr);
             for( int i=0 ; i<af.ats.size(); ++i ) af.ats[i].name=vlab[i];
         }
-        npfr++; ffirstcell=false;
+        npfr++; 
         if (!fhavecell) //sets up unit cell for PBC
         {
             fhavecell=true;
-            ffirstcell=true;
-            if (fbox!="")
-            {
-                ifbox.open(fbox.c_str());
-                for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CM(j,i);
-                if (!ifbox.good()) ERROR("Format error in box file.");
-            }
+            if (fbox!="") {  CM = CBOX;  }
             else if (fdlp) { af2cm(af,CM); }        
             else fhavecell=false;
-            if (fweights!="")
-            {
-                ifweights.open(fweights.c_str());
-            }
             if (fhavecell)
             {
                 MatrixInverse(CM,ICM);
@@ -729,24 +732,14 @@ int main(int argc, char **argv)
                 if (reffr.ats.size()!=af.ats.size()) ERROR("Atom number mismatch between reference and trajectory frames!");
             }
         }
-        if (fvbox && ! ffirstcell)
+        if (fvbox)
         {
-            if (fbox!="")
-            {
-                    //read one more matrix from box file
-                for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CM(j,i);
-                if (!ifbox.good()) ERROR("Format error in box file.");
-            }
+            if (fbox!="") { CM = CBOX; }
             else if (fdlp) { af2cm(af,CM); }
             MatrixInverse(CM,ICM);
             //updates the average volume
             cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
                     CM(0,2)*CM(1,1)*CM(2,0)+CM(0,1)*CM(1,0)*CM(2,2)+CM(2,1)*CM(1,2)*CM(0,0)) - cvolume)/npfr ;
-        }
-        if (fweights!="")
-        {
-            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
-            if (!ifweights.good()) ERROR("Format error in weights file.");
         }
         if (funwrap)
         {
