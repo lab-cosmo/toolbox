@@ -14,17 +14,20 @@ void banner()
             << "                                                                                \n"
             << " compute the histogram of a series of data, in ndim dimensions.                 \n"
             << " data must be formatted as                                                      \n"
-            << " D1(1)   D2(1)  .......   DN(1) [ WEIGHT(1) ]                                   \n"
+            << " D1(1)   D2(1)  .......   DN(1) [VALUE(1)] [ WEIGHT(1) ]                        \n"
             << " on every dimension n (default:100) bins are distributed evenly.                \n"
             << " between xi and xf. optionally, triangle (b) smoothing functions can be used.     \n"
             << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
             << " the data point is inside the interval.                                       \n"
             << " If dimension is 2 and -g is selected, points will be output in gnuplot format. \n"
+            << " If -avg is selected, then a quantity is read after each point, and the output  \n"
+            << "    is the conditional average of that quantity constrained to the value of x   \n"
             << " If -w is selected, then a weight is read after each point.                     \n"
             << " If -as is selected, the final histogram will be smoothed adaptively, with      \n"
             << "    a smoothing radius going which depends on the central value.                \n"
             << "    the radius is determined by mode: linear(min,max) interpolates linearly     \n"
-            << "    log(min,max,drad) uses logarithm of the ratio and a sigmoid function        \n";
+            << "    log(min,max,drad) uses logarithm of the ratio and a sigmoid function        \n"
+            << "    [DEPRECATED]                                                                \n";
 }
 
 
