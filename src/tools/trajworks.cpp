@@ -347,7 +347,7 @@ void banner()
             << " -pcanocov only computes the mean position of atoms, not covariance of PCA      \n"
             << " ## mean square displacement calculation (-msd)                                 \n"
             << " -msdat    label of the monitored specie [*]                                    \n"
-            << " -msdlag    maximum time-lag to compute msd for [1000]                           \n"
+            << " -msdlag   maximum time-lag to compute msd for [1000]                           \n"
             << " ## velocity-velocity correlation options (-vvac)                               \n"
             << " -vvat     label of the monitored specie [*]                                    \n"
             << " -vvlag    maximum time-lag to compute vvac for [1000]                          \n"
@@ -697,9 +697,9 @@ int main(int argc, char **argv)
         }
 
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
-        { std::cerr<<"Skipping frame   "<<nfr<<"\r"; continue; }
+        { std::cerr<<"Skipping frame   "<<std::setw(10)<<std::setiosflags(std::ios::right)<<nfr<<"\r"; continue; }
 
-        std::cerr<<  "Processing frame "<<nfr<<"\r";
+        std::cerr<<  "Processing frame "<<std::setw(10)<<std::setiosflags(std::ios::right)<<nfr<<"\r";
         if (vlab.size()!=0)
         {
             if (af.ats.size()!=vlab.size()) ERROR("Atom number mismatch at frame"<<nfr);
