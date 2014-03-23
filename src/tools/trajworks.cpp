@@ -314,6 +314,7 @@ void banner()
             << " -idlp     input is a DLPOLY HISTORY file                                       \n"
             << " -ref      reads reference for alignment, etc. from the given file              \n"
             << " -box file reads cell parameters from file ( axx axy axz\n ayx ayy ... )        \n"
+            << " -qat file reads atomic charges from file ( label q1 \n label q2  ... )         \n"
             << " -unwrap   unwraps PBCs, i.e. makes sure trajectories are continuous....        \n"
             << " -vbox     enables variable box (to be read from DLP or sequentially from box)  \n"
             << " -lab file reads atoms labels from file ( lab1 lab2 lab3....  )                 \n"
@@ -376,7 +377,7 @@ int main(int argc, char **argv)
     CLParser clp(argc, argv);
 
     bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
-    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
+    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
@@ -392,6 +393,7 @@ int main(int argc, char **argv)
             clp.getoption(fdlp,"idlp",false) &&
             clp.getoption(fref,"ref",std::string("")) &&
             clp.getoption(fbox,"box",std::string("")) &&
+            clp.getoption(fqat,"qat",std::string("")) &&
             clp.getoption(flab,"lab",std::string("")) &&
             clp.getoption(fvbox,"vbox",false) &&
             clp.getoption(shwin,"hwin",std::string("delta")) &&
@@ -660,6 +662,19 @@ int main(int argc, char **argv)
     std::ifstream ifbox; 
     FMatrix<double> CBOX(3,3), CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
    
+    //charge dictionary
+    std::ifstream ifqat;
+    std::map<std::string, double> qmap;
+    if (fqat!="") 
+    {
+       std::string qlabel; double qq;
+       ifqat.open(fqat.c_str());
+       while (ifqat.good())
+       {
+          ifqat>>qlabel>>qq; 
+          qmap[qlabel]=qq;
+       }
+    }
     //weights reading
     std::ifstream ifweights;
 
@@ -695,7 +710,13 @@ int main(int argc, char **argv)
             ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
             if (!ifweights.good()) ERROR("Format error in weights file.");
         }
-
+        if (fqat!="")
+        {   // infers charges from atomic labels -- note that undefined labels will be set to have charge zero!
+           for (int i=0; i<af.ats.size(); ++i)
+           {
+              af.ats[i].nprops["charge"]=qmap[af.ats[i].name];
+           }
+        }        
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
         { std::cerr<<"Skipping frame   "<<std::setw(10)<<std::setiosflags(std::ios::right)<<nfr<<"\r"; continue; }
 
