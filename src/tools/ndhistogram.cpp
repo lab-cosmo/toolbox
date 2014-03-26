@@ -157,9 +157,34 @@ int main(int argc, char **argv)
     else
     {
         //ALSO PERIODIC ACTUALLY WORKS ONLY IN 2D. TOTALLY NEEDS CLEANING UP AND GENERALIZING!!!
-        if (ndim!=2) ERROR("GNUPLOT format works only for dimension 2\n");
-        std::valarray<long> ind(2); std::valarray<double> cen(2); double val, valy;
+        std::valarray<long> ind(ndim); std::valarray<double> cen(ndim); double val, valy;
+        
         //if (!fperiodic)
+        ind = 0;
+        while (ind[0]<hgo[0].boundaries.size()-1)
+        {
+           HG.get_bin(ind,cen,val);
+           // prints out the center of the histogram bin 
+           for (int i=0; i<ndim; i++)
+              std::cout<<cen[i]<<"\t";
+           if (!faverage)
+           {
+              std::cout<<val<<"\n";
+           }
+           else
+           {
+              HGY.get_bin(ind,cen,valy);
+              std::cout<<valy/val*ay<<"\n";
+           }
+           ind[ndim-1]++;
+           for (int i=(ndim-1); i>0; --i)
+              if (ind[i]>=hgo[i].boundaries.size()-1) 
+              { 
+                 ind[i-1]++; ind[i]=0;
+                 if (i==1) std::cout<<"\n"; // newline on outer loop (gnuplot compatibility)
+              }            
+        }   
+        /*
         for (int i=0; i<hgo[0].boundaries.size()-1; ++i)
         {
             for (int j=0; j<hgo[1].boundaries.size()-1; ++j)
@@ -179,7 +204,8 @@ int main(int argc, char **argv)
                 }
             }
             std::cout<<std::endl;
-        }
+        }*/
+        
 /*        else
         {
         std::valarray<double> pcen(2); double pval;
