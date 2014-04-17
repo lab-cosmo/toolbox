@@ -9,14 +9,19 @@ void banner()
     std::cerr
             << " USAGE: histogram -xi xi -xf xf [-n nbins] [-whard|-wnorm|-wperi] [-w] [-avg]  \n"
             << "                  [(-b box-w|-t tri-w|-g1 g1-w|-g2 g2-w|-g3 g3-w|-g5 g5-w)]      \n"
+            << "                  [-adaptive err]                                               \n"
             << " compute the histogram of a series of data, with nbins (default:100) bins       \n"
             << " distributed evenly between xi and xf. optionally, box (b) or triangular (t)  \n"
-            << " smoothing functions can be used. If -w is selected, then a weight is read     \n"
-            << " after each point (input must be value weigth value weight ...).              \n"
+            << " smoothing functions can be used. -adaptive uses a simple procedure to adaptively \n"
+            << " smoothen the histogram as it is built, trying to have a relative error of err \n"
+            << " on the histogram value at each point.                         \n" 
+            << " If -w is selected, then a weight is read after each point     \n"
+            << " (input must be value weigth value weight ...).              \n"
             << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
             << " the data point is inside the interval.                                       \n"
             << " If [-avg] is selected, on each line it will be read x y [w] and the average   \n"
             << " of y will be evaluated as a function of x, in a binned fashion.              \n";
+            
 }
 
 int main(int argc, char **argv)
@@ -25,7 +30,7 @@ int main(int argc, char **argv)
 
     CLParser clp(argc, argv);
     bool fhelp, fweighted, faverage, fhard, fnorm, fperi;
-    double a,b,wb,wt,wg1,wg2,wg3,wg5;
+    double a,b,wb,wt,wg1,wg2,wg3,wg5,aeps;
     unsigned long nbins;
     bool fok=
             clp.getoption(nbins,"n",(unsigned long) 100) &&
@@ -37,6 +42,7 @@ int main(int argc, char **argv)
             clp.getoption(wg2,"g2",0.) &&
             clp.getoption(wg3,"g3",0.) &&
             clp.getoption(wg5,"g5",0.) &&
+            clp.getoption(aeps,"adaptive",0.) &&
             clp.getoption(fweighted,"w",false) &&
             clp.getoption(faverage,"avg",false) &&
             clp.getoption(fhard,"whard",false) &&
@@ -62,6 +68,9 @@ int main(int argc, char **argv)
     if (fhard) hgo.walls=HGBHard;
     else if (fnorm) hgo.walls=HGBHardNorm;
     else if (fperi) hgo.walls=HGBPeriodic;
+    
+    hgo.adaptive_eps = aeps;
+    
     HG.set_options(hgo); HGY.set_options(hgo);
 
     double val, weight, y, ty, ny;
@@ -84,7 +93,9 @@ int main(int argc, char **argv)
 
    double above, below;
    HG.get_outliers(above,below);
-   std::cout<<"# Total weight: "<< HG.get_totweight()<<std::endl;
+   std::cout<<"# Total weight: "<< HG.get_totweight();
+   if (aeps > 0) std::cout<< " adaptive smoothing target relative error: "<< aeps;
+   std::cout<<std::endl;
    std::cout<<"# Fraction below: "<<below<<std::endl;
    std::cout<<"# Fraction above: "<<above<<std::endl;
 

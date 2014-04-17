@@ -25,14 +25,19 @@ namespace toolbox {
         HGWindowMode window; HGBoundaryMode walls;
 
         U window_width;
+        
+        U adaptive_eps;
 
         double (*window_function)(const U& a, const U& b);
         std::valarray<U> boundaries;
 
 
-        HGOptions(const HGWindowMode& nwindow=HGWDelta, const U nwindow_width=(U)0., const std::valarray<U>& nbnd=std::valarray<U>(0), const HGBoundaryMode& nwalls=HGBNormal) :
-            window(nwindow), window_width(nwindow_width), walls(nwalls) { boundaries.resize(nbnd.size()); boundaries=nbnd; }
+        HGOptions(const HGWindowMode& nwindow=HGWDelta, const U nwindow_width=(U)0., const U nadaptive_eps=(U)0.,
+                    const std::valarray<U>& nbnd=std::valarray<U>(0), const HGBoundaryMode& nwalls=HGBNormal) :
+            window(nwindow), window_width(nwindow_width), adaptive_eps(nadaptive_eps), walls(nwalls) 
+            { boundaries.resize(nbnd.size()); boundaries=nbnd; }
         HGOptions(const HGOptions& hgo) : walls(hgo.walls), window(hgo.window), window_width(hgo.window_width),
+                  adaptive_eps(hgo.adaptive_eps),
                   window_function(hgo.window_function), boundaries(hgo.boundaries) {}
         HGOptions& operator=(const HGOptions& hgo)
         {
@@ -41,6 +46,7 @@ namespace toolbox {
             walls=hgo.walls;
             window_width=hgo.window_width;
             window_function=hgo.window_function;
+            adaptive_eps=hgo.adaptive_eps;
             boundaries.resize(hgo.boundaries.size()); boundaries=hgo.boundaries;
             return *this;
         }
@@ -276,14 +282,35 @@ namespace toolbox {
         }
         if (opts.window!=HGWDelta)
         {
-            double nb=0.; double hw;
+            double nb=0.; double hw, ww;
+            
+            // use an adaptive width based on the current number of samples at the central bin.
+            // note that this assumes that the point weight, if given, corresponds to a number of
+            // (uncorrelated) samples
+            if (opts.adaptive_eps > 0.0)
+            {
+                if (bins[ib]==0.0)
+                {   // spreads the sample over ALL the bins!                    
+                    bins += weight/range;
+                    ndata += weight;
+                    return;
+                }
+                else
+                {
+                    ww = 1.0/(bins[ib]*opts.adaptive_eps*opts.adaptive_eps);
+                    if (ww>range) ww = range;
+                    if (ww<opts.window_width) ww=opts.window_width;
+                }                
+            }
+            else ww = opts.window_width;
+                      
             switch(opts.walls)
             {
             case HGBPeriodic: // Periodic walls, apply minimum image convention
                 //adds weights for bins smaller than ib (possibly going round)
                 for (ia=ib-1; ia>=0; --ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     if (nb==0) break; else bins[ia]+=nb*weight;
                 }
@@ -293,7 +320,7 @@ namespace toolbox {
                     //makes sure not to count points twice by stopping at ib
                     for (ia=bs-1; ia>=ib; --ia)
                     {
-                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                        nb=wf((opts.boundaries[ia]-hw)/ww,(opts.boundaries[ia+1]-hw)/ww)
                                 /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                         if (nb==0) break; else bins[ia]+=nb*weight;
                     }
@@ -302,7 +329,7 @@ namespace toolbox {
 
                 for (ia=ib; ia<bs; ++ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     if (nb==0) break; else bins[ia]+=weight*nb;
                 }
@@ -312,7 +339,7 @@ namespace toolbox {
                     hw=nel-range;
                     for (ia=0; ia<ib; ++ia)
                     {
-                        nb=wf((opts.boundaries[ia]-hw)/opts.window_width,(opts.boundaries[ia+1]-hw)/opts.window_width)
+                        nb=wf((opts.boundaries[ia]-hw)/ww,(opts.boundaries[ia+1]-hw)/ww)
                                 /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                         if (nb==0) break; else bins[ia]+=nb*weight;
                     }
@@ -324,20 +351,20 @@ namespace toolbox {
                 //adds weights for bins smaller than ib
                 for (ia=ib-1; ia>=0; --ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                    if (nb==0) break; else bins[ia]+=nb*weight;
+                    if (nb==0) break; else bins[ia]+=nb*weight;   
                 }
                 if (ia<0)
-                    below+=weight*wf(-std::numeric_limits<U>::max(),(opts.boundaries[0]-nel)/opts.window_width);
+                    below+=weight*wf(-std::numeric_limits<U>::max(),(opts.boundaries[0]-nel)/ww);
                 for (ia=ib; ia<bs; ++ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
-                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);                        
                     if (nb==0) break; else bins[ia]+=weight*nb;
                 }
                 if (ia==bs)
-                    above+=weight*wf((opts.boundaries[bs]-nel)/opts.window_width,std::numeric_limits<U>::max());
+                    above+=weight*wf((opts.boundaries[bs]-nel)/ww,std::numeric_limits<U>::max());
                 break;
 
             case HGBHard:  // Hard walls, constraint the density to the available space -- with asymmetric kernel.
@@ -346,7 +373,7 @@ namespace toolbox {
                 if (nel>opts.boundaries[bs]) {above+=weight; break; }
                 // integrate below nel
                 hw=nel-opts.boundaries[0];
-                if (hw>opts.window_width) hw=opts.window_width;
+                if (hw>ww) hw=ww;
 
                 //get the amount of density that would spill out
                 if (hw==0) bins[0]+=0.5*weight/(opts.boundaries[1]-opts.boundaries[0]);
@@ -363,7 +390,7 @@ namespace toolbox {
 
                 // integrate above nel
                 hw=opts.boundaries[bs]-nel;
-                if (hw>opts.window_width) hw=opts.window_width;
+                if (hw>ww) hw=ww;
 
                 if (hw==0) bins[bs-1]+=0.5*weight/(opts.boundaries[bs]-opts.boundaries[bs-1]);
                 else
@@ -385,30 +412,31 @@ namespace toolbox {
 
                 hw=0.0;
                 //get the amount of density that would spill out below
-                if (nel-opts.boundaries[0]<opts.window_width)
-                {  hw+=wf(-1.0,(opts.boundaries[0]-nel)/opts.window_width);  }
-                if (opts.boundaries[bs]-nel<opts.window_width)
-                {  hw+=wf((opts.boundaries[bs]-nel)/opts.window_width,1.0);  }
+                if (nel-opts.boundaries[0]<ww)
+                {  hw+=wf(-1.0,(opts.boundaries[0]-nel)/ww);  }
+                if (opts.boundaries[bs]-nel<ww)
+                {  hw+=wf((opts.boundaries[bs]-nel)/ww,1.0);  }
                 //get the re-normalizing factor
                 hw=1.0/(1.0-hw);
 
                 above=1;
                 for (ia=ib-1; ia>=0; --ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     if (nb==0) break; else bins[ia]+=nb*hw*weight;
                 }
                 for (ia=ib; ia<bs; ++ia)
                 {
-                    nb=wf((opts.boundaries[ia]-nel)/opts.window_width,(opts.boundaries[ia+1]-nel)/opts.window_width)
+                    nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     above-=nb*hw*weight*(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     if (nb==0) break; else bins[ia]+=weight*hw*nb;
                 }
             }
         }
+        
         ndata+=weight;
     }
 
