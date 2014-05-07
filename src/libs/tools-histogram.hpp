@@ -25,7 +25,7 @@ namespace toolbox {
         HGWindowMode window; HGBoundaryMode walls;
 
         U window_width;
-        
+
         U adaptive_eps;
 
         double (*window_function)(const U& a, const U& b);
@@ -34,7 +34,7 @@ namespace toolbox {
 
         HGOptions(const HGWindowMode& nwindow=HGWDelta, const U nwindow_width=(U)0., const U nadaptive_eps=(U)0.,
                     const std::valarray<U>& nbnd=std::valarray<U>(0), const HGBoundaryMode& nwalls=HGBNormal) :
-            window(nwindow), window_width(nwindow_width), adaptive_eps(nadaptive_eps), walls(nwalls) 
+            window(nwindow), window_width(nwindow_width), adaptive_eps(nadaptive_eps), walls(nwalls)
             { boundaries.resize(nbnd.size()); boundaries=nbnd; }
         HGOptions(const HGOptions& hgo) : walls(hgo.walls), window(hgo.window), window_width(hgo.window_width),
                   adaptive_eps(hgo.adaptive_eps),
@@ -283,27 +283,36 @@ namespace toolbox {
         if (opts.window!=HGWDelta)
         {
             double nb=0.; double hw, ww;
-            
+
             // use an adaptive width based on the current number of samples at the central bin.
             // note that this assumes that the point weight, if given, corresponds to a number of
-            // (uncorrelated) samples
+            // (uncorrelated) samples otherwise the relation between spread and error is lost
             if (opts.adaptive_eps > 0.0)
             {
                 if (bins[ib]==0.0)
-                {   // spreads the sample over ALL the bins!                    
+                {   // spreads the sample over ALL the bins!
                     bins += weight/range;
                     ndata += weight;
                     return;
                 }
                 else
                 {
+					/* the idea here is as follows. the central bin already contains n=N P(x)*dx samples.
+					 * if we have in total added N samples, assuming a binomial distribution, 
+					 * this has a variance N P(x) dx (1-P(x)dx) ~ N P dx (the probability of being in a given bin
+					 * is small) which is equal to n. so the relative error in P(x) is of the order of 
+					 * 1/sqrt(n). If we use a kernel of width ww, we effectively average over
+					 * O(ww/bin size) cells, which for simplicity we assume to be uncorrelated.
+					 * Then, the error goes down to sqrt(binsize/(n ww)). if we want the relative error to be 
+					 * aeps, then aeps^2=binsize/(n ww) so ww=binsize/(n aeps^2). since n/binsize = bin value ...
+					*/
                     ww = 1.0/(bins[ib]*opts.adaptive_eps*opts.adaptive_eps);
                     if (ww>range) ww = range;
                     if (ww<opts.window_width) ww=opts.window_width;
-                }                
+                }
             }
             else ww = opts.window_width;
-                      
+
             switch(opts.walls)
             {
             case HGBPeriodic: // Periodic walls, apply minimum image convention
@@ -353,14 +362,14 @@ namespace toolbox {
                 {
                     nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
                             /(opts.boundaries[ia+1]-opts.boundaries[ia]);
-                    if (nb==0) break; else bins[ia]+=nb*weight;   
+                    if (nb==0) break; else bins[ia]+=nb*weight;
                 }
                 if (ia<0)
                     below+=weight*wf(-std::numeric_limits<U>::max(),(opts.boundaries[0]-nel)/ww);
                 for (ia=ib; ia<bs; ++ia)
                 {
                     nb=wf((opts.boundaries[ia]-nel)/ww,(opts.boundaries[ia+1]-nel)/ww)
-                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);                        
+                            /(opts.boundaries[ia+1]-opts.boundaries[ia]);
                     if (nb==0) break; else bins[ia]+=weight*nb;
                 }
                 if (ia==bs)
@@ -436,7 +445,7 @@ namespace toolbox {
                 }
             }
         }
-        
+
         ndata+=weight;
     }
 
@@ -581,14 +590,16 @@ std::ostream& operator<<(std::ostream& os, const NDHistogram<U>& his)
 template<class U>
 void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
 {
+    // adds a data point to the n-dimensional histogram
     std::valarray<U> nel(pnel);
 
     for (int i=0; i<dim; ++i) if (opts[i].walls==HGBPeriodic)  //folds into the interval
     {   nel[i]=nel[i]/range[i];   nel[i]=center[i]+range[i]*(nel[i]-round(nel[i]));   }
 
-    std::valarray<long> p(dim);
+    std::valarray<long> p(dim); //these are the coordinates of the center
     long bs, ia, ib, ic;
-    //First, finds the "coordinates" of the center
+
+    //first, finds the "coordinates" of the center along all directions
     for (int i=0; i<dim; ++i)
     {
         bs=nbin[i]; ia=0; ic=bs; ib=(ic+1)/2;
@@ -610,17 +621,24 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
     double (*wf)(const U& a, const U& b);
     std::valarray<std::valarray<double> > tbins(dim);
     int i;
+
+    // so, a couple of words to explain how this works. we consider a D-dimensional
+    // kernel which is a product of 1-d kernels K(x1,x2...)=K(x1)K(x2)....
+    // so the integral of the kernel over each bin is the product of the integrals over
+    // the "marginal bins" in each of the D dimensions.
+    // so, we first compute these marginal integrals, and then make the products to get
+    // the bin weights in D dimensions.
     for (i=0; i<dim; ++i)
     {
         tbins[i].resize(nbin[i]); tbins[i]=0.;
-        //std::cerr<<"running through dimension "<<i<<":"<<tbins[i].size()<<"\n";
+
         std::valarray<long> ap(p);
 
         switch(opts[i].window)
         {
         case HGWDelta:
             if ((p[i]==0 && nel[i]< opts[i].boundaries[0]) || p[i]>=nbin[i])  break;
-            tbins[i][p[i]]=weight;///(opts[i].boundaries[p[i]+1]-opts[i].boundaries[p[i]]);
+            tbins[i][p[i]]=1.0;
             break;
         case HGWBox:
             wf=__hgwfbox;
@@ -643,17 +661,48 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
         default:
             ERROR("Windowing mode not implemented yet!\n");
         }
+
         if (opts[i].window!=HGWDelta)
         {
-            double nb=0.;   double hw;
+            double nb=0.;   double hw, ww;
 
-            switch(opts[i].walls)
+            // use an adaptive width based on the current number of samples at the central bin.
+            // note that this assumes that the point weight, if given, corresponds to a number of
+            // (uncorrelated) samples
+            if (opts[i].adaptive_eps > 0.0)
+            {
+                if (bins[c2b(p)]==0.0)
+                {   // spreads the sample over ALL the bins!
+                    tbins[i] += 1.0/nbin[i];
+                    ww = -1.0;
+                }
+                else
+                {
+					/* the idea here is analogous to the 1D case, only we must take care of dimensionality. 
+					 * the central bin already contains n=N P(x)*dx samples.
+					 * if we have in total added N samples, assuming a binomial distribution, 
+					 * this has a variance N P(x) dx (1-P(x)dx) ~ N P dx (the probability of being in a given bin
+					 * is small) which is equal to n. so the relative error in P(x) is of the order of 
+					 * 1/sqrt(n). If we use a kernel of width ww, we effectively average over
+					 * O(m=ww^D/binvolume) cells, which for simplicity we assume to be uncorrelated.
+					 * Then, the error goes down to sqrt(1/(n m)). if we want the relative error to be 
+					 * aeps, then aeps^2=1/(m ww) so ww=(binvolume/(n aeps^2))^1/d. since n/binvolume = bin value ...
+					*/
+                    ww = 1.0/pow(bins[c2b(p)]*opts[i].adaptive_eps*opts[i].adaptive_eps,1.0/dim);
+                    
+                    if (ww>range[i]) ww = range[i];
+                    if (ww<opts[i].window_width) ww=opts[i].window_width;                    
+                }
+            }
+            else ww = opts[i].window_width;            
+
+            if (ww>=0) switch(opts[i].walls)
             {
             case HGBPeriodic: // Periodic walls, apply minimum image convention
                 //adds weights for bins smaller than ib (possibly going round)
                 for (ia=p[i]-1; ia>=0; --ia)
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/ww,(opts[i].boundaries[ia+1]-nel[i])/ww);
                     if (nb==0) break; else tbins[i][ia]+=nb;
                 }
                 if (ia<0)  //spill over
@@ -662,7 +711,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
                     //makes sure not to count points twice
                     for (ia=nbin[i]-1; ia>=p[i]; --ia)
                     {
-                        nb=wf((opts[i].boundaries[ia]-hw)/opts[i].window_width,(opts[i].boundaries[ia+1]-hw)/opts[i].window_width);
+                        nb=wf((opts[i].boundaries[ia]-hw)/ww,(opts[i].boundaries[ia+1]-hw)/ww);
                         if (nb==0) break; else tbins[i][ia]+=nb;
                     }
                     if (ia<p[i]) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
@@ -670,7 +719,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
 
                 for (ia=p[i]; ia<nbin[i]; ++ia)
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/ww,(opts[i].boundaries[ia+1]-nel[i])/ww);
                     if (nb==0) break; else tbins[i][ia]+=nb;
                 }
                 if (ia==nbin[i])
@@ -678,7 +727,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
                     hw=nel[i]-range[i];
                     for (ia=0; ia<p[i]; ++ia)
                     {
-                        nb=wf((opts[i].boundaries[ia]-hw)/opts[i].window_width,(opts[i].boundaries[ia+1]-hw)/opts[i].window_width);
+                        nb=wf((opts[i].boundaries[ia]-hw)/ww,(opts[i].boundaries[ia+1]-hw)/ww);
                         if (nb==0) break; else tbins[i][ia]+=nb;
                     }
                     if (ia==p[i]) break; // means the window is crazily broad and we went around! arguably we should actually raise an error
@@ -687,12 +736,12 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
             case HGBNormal: // Normal walls, density will spill out
                 for (ia=p[i]-1; ia>=0; --ia)
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/ww,(opts[i].boundaries[ia+1]-nel[i])/ww);
                     if (nb==0) break; else tbins[i][ia]+=nb;
                 }
                 for (ia=p[i]; ia<nbin[i]; ++ia)
                 {
-                    nb=wf((opts[i].boundaries[ia]-nel[i])/opts[i].window_width,(opts[i].boundaries[ia+1]-nel[i])/opts[i].window_width);
+                    nb=wf((opts[i].boundaries[ia]-nel[i])/ww,(opts[i].boundaries[ia+1]-nel[i])/ww);
                     if (nb==0) break; else tbins[i][ia]+=nb;
                 }
                 break;
@@ -703,7 +752,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
                 if (nel[i]>opts[i].boundaries[nbin[i]]) break;
 
                 hw=nel[i]-opts[i].boundaries[0];
-                if (hw>opts[i].window_width) hw=opts[i].window_width;
+                if (hw>ww) hw=ww;
 
                 if (hw==0) tbins[i][0]+=0.5;
                 else
@@ -717,7 +766,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
                 }
 
                 hw=opts[i].boundaries[nbin[i]]-nel[i];
-                if (hw>opts[i].window_width) hw=opts[i].window_width;
+                if (hw>ww) hw=ww;
 
                 if (hw==0) tbins[i][nbin[i]-1]+=0.5;
                 else
@@ -734,6 +783,7 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
             }
         }
     }
+    
     //now we must make all the products and increment
     if (i<dim) { outliers+=weight; return; }
     std::valarray<long> minp(dim), maxp(dim); minp=0; maxp=0;

@@ -11,17 +11,19 @@ void banner()
             << "                  [(-b box-w|-t tri-w|-g1 g1-w|-g2 g2-w|-g3 g3-w|-g5 g5-w)]      \n"
             << "                  [-adaptive err]                                               \n"
             << " compute the histogram of a series of data, with nbins (default:100) bins       \n"
-            << " distributed evenly between xi and xf. optionally, box (b) or triangular (t)  \n"
-            << " smoothing functions can be used. -adaptive uses a simple procedure to adaptively \n"
-            << " smoothen the histogram as it is built, trying to have a relative error of err \n"
-            << " on the histogram value at each point.                         \n" 
+            << " distributed evenly between xi and xf. optionally, box (b), triangular (t)  \n"
+            << " or Gaussian (-g?) smoothing functions can be used.                         <n"
             << " If -w is selected, then a weight is read after each point     \n"
             << " (input must be value weigth value weight ...).              \n"
-            << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
-            << " the data point is inside the interval.                                       \n"
             << " If [-avg] is selected, on each line it will be read x y [w] and the average   \n"
-            << " of y will be evaluated as a function of x, in a binned fashion.              \n";
-            
+            << " of y will be evaluated as a function of x, in a binned fashion.              \n"
+            << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
+            << " the data point is inside the interval. [-wperi] uses periodic boundaries.    \n"
+            << " -adaptive uses a simple procedure to adaptively smoothen the histogram as \n"
+            << " it is built, trying to have a relative error of err on the histogram value \n"
+            << " at each point.\n"
+            ;
+
 }
 
 int main(int argc, char **argv)
@@ -68,9 +70,9 @@ int main(int argc, char **argv)
     if (fhard) hgo.walls=HGBHard;
     else if (fnorm) hgo.walls=HGBHardNorm;
     else if (fperi) hgo.walls=HGBPeriodic;
-    
+
     hgo.adaptive_eps = aeps;
-    
+
     HG.set_options(hgo); HGY.set_options(hgo);
 
     double val, weight, y, ty, ny;
