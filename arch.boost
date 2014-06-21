@@ -1,0 +1,3 @@
+# use these flags to activate regular expressions matching using boost
+LDFLAGS:=$(LDFLAGS) -lboost_regex
+CXXFLAGS:=$(CXXFLAGS) -D__USEREGEX

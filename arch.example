@@ -1,0 +1,5 @@
+
+LDFLAGS=-lfftw3 -llapack
+CXX=g++
+CXXFLAGS=-O3 -ftracer -g -mtune=native
+

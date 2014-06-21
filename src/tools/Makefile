@@ -17,7 +17,7 @@ all: $(TOOLS)
            rm -f $@.$$$$
 
 trajworks.o: trajworks.cpp trajworks.d
-	$(CXX) -c $(DREGEX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) 
+	$(CXX) -c $(DREGEX) $(CXXFLAGS) -o $@ $<
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDS)
@@ -25,7 +25,7 @@ clean:
 # generates -- and targets -- executables in another directory
 $(TOOLS): % : ../../bin/%
 $(TOOLS:%=../../bin/%): ../../bin/%: %.o 
-	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(TBLDFLAGS)
 
 ../../bin/trajworks: trajworks.o
-	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS) 
+	$(CXX) $(CXXFLAGS) -o $@ $< $(TBLDFLAGS) 

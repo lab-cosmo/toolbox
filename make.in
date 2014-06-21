@@ -1,0 +1,27 @@
+# DO NOT MODIFY THIS FILE. Please edit the appropriate arch file instead
+# Sane defaults for compiling on a system that 
+# has all the libraries installed
+LDFLAGS=-lfftw3 -llapack
+CXX=g++
+CXXFLAGS=-O3 -ftracer -g -mtune=native
+
+REL=../..
+ifneq ($(ARCH),)
+   -include $(REL)/arch.$(ARCH)
+endif
+
+# This combine otpional flags with those that
+# are necessary for compilation
+TBLDFLAGS=-L../libs -ltoolbox $(LDFLAGS)
+MAKEDEPEND=$(CXX) -M $(CXXFLAGS)
+
+# Parallel/serial compilation
+ifneq ($(PARALLEL),)
+  CXXFLAGS:=$(CXXFLAGS) -DTB_MPI
+endif
+
+# Switches for debug mode
+ifneq ($(DEBUG),)
+  CXXFLAGS:=-DLSD_DEB -DPCFS_MDBG -DDEBUG -O0 -pg -g -Wall $(CXXFLAGS) 
+endif
+
