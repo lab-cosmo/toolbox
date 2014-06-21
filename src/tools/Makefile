@@ -1,3 +1,4 @@
+LDFLAGS=-L../libs -ltoolbox
 -include ../../make.in
 
 SOURCES=$(shell ls *.cpp)
