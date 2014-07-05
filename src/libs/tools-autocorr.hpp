@@ -38,7 +38,7 @@ public:
             timestep(ntimestep), xmean(nxmean), xsigma(nxsigma),
             xtau(nxtau), xtau2(nxtau2),
             f_exact_mean(nf_exact_mean), f_exact_sigma(nf_exact_sigma),
-            f_exact_tau(nf_exact_tau), f_exact_tau2(nf_exact_tau2){}
+            f_exact_tau(nf_exact_tau), f_exact_tau2(nf_exact_tau2) {}
 };
         
 template <class U> class AutoCorrelation {
@@ -298,7 +298,6 @@ void AutoCorrelation<U>::mkacf()
         for (unsigned long s=0; s<p_nseries; ++s)
         if (serieslengths[s]>p_ncorr) //only series contributing meaningful data are considered
         {
-            std::cerr<<"Working through series "<<s<<"\n";
             //in order to get proper renormalization of accumulated series, the 
             //series zero (the collapsed one) must be treated slightly differently,
             //as all the data sets contain the accumulated acf from the other series.
@@ -320,14 +319,8 @@ void AutoCorrelation<U>::mkacf()
             sacf.resize(p_ncorr);
             for(unsigned long i=0; i<p_ncorr; ++i) sacf[i]=autodata[s][i];
 #endif
-
-#ifdef TB_FFTAC
             //if collapsed series, autodata[0] already contains the autocorrelation
-            
-            
-#endif
-            std::cerr<<"ACF computed\n";
-            timing.start();
+
             //treats head and tail effects...
             v=0;
             if (s==0 && n_collapsed>0) for (unsigned long h=0; h<p_ncorr; ++h)
@@ -341,7 +334,6 @@ void AutoCorrelation<U>::mkacf()
                 v+=headdata[s][h]+history[s][(((unsigned long) serieslengths[s])-1-h)%p_ncorr];
             }
             timing.stop();
-            std::cerr<<"Tails computed, time "<<timing<<" \n";
             nsmp+=serieslengths[s];
         }
         for (unsigned long h=0; h<p_ncorr; ++h)
