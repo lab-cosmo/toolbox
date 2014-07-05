@@ -25,8 +25,8 @@ void banner()
             << " if -coll is specified, series are collapsed when finished to save memory.      \n"
             << " the error is computed from the integral of the ACF^2, which can be given as    \n"
             << " input. if the -s option is selected, the code writes only mean, sigma, tau and \n"
-            << " tau2 on a single line, then exit. -v enables verbose output on stderr,          n"
-            << " including progress output.                                                      n"
+            << " tau2 on a single line, then exit. -v enables verbose output on stderr,         \n"
+            << " including progress output.                                                     \n"
             << "                                                                                \n";
 }
 
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
             clp.getoption(fverbose,"v",false) &&
             clp.getoption(fshort,"s",false);
     
-    if ( fhelp || ! fok) { banner(); return 0; }
+    if ( fhelp || ! fok || ! clp.chkunknown(true)) { banner(); return 0; }
     if (stride==0) stride=1;
     AutoCorrelation<double> AC(ncorr, acopts);
 
