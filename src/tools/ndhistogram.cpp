@@ -9,25 +9,25 @@ void banner()
 {
     std::cerr
             << " USAGE: ndhistogram -d dims -xi 'xi1,...,xin' -xf 'xf1,...,xfn'                 \n"
-            << "                    [-n 'n1,...,nn'] [-b 'b1,...,bn'] [-w] [-g] [-avg]          \n"
-            << "                    [-as mode(parameters)] [-whard|-wperi]                      \n"
+            << "                    [-n 'n1,...,nn'] [-(t|b|g1|g2|g3|g5) 'w1,...,wn']           \n"
+            << "                    [-w] [-g] [-avg] [-whard|-wperi] [-adaptive err]            \n"
             << "                                                                                \n"
             << " compute the histogram of a series of data, in ndim dimensions.                 \n"
             << " data must be formatted as                                                      \n"
             << " D1(1)   D2(1)  .......   DN(1) [VALUE(1)] [ WEIGHT(1) ]                        \n"
             << " on every dimension n (default:100) bins are distributed evenly.                \n"
-            << " between xi and xf. optionally, triangle (b) smoothing functions can be used.     \n"
+            << " between xi and xf. optionally, box (b), triangular (t) or Gaussian (-g?)  \n"
+            << " smoothing functions can be used. w? determines the window in each dimension \n"
             << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
-            << " the data point is inside the interval.                                       \n"
-            << " If dimension is 2 and -g is selected, points will be output in gnuplot format. \n"
+            << " the data point is inside the interval).  [-wperi] uses periodic boundaries.    \n"
+            << " If -g is selected, points will be output in gnuplot format. \n"
             << " If -avg is selected, then a quantity is read after each point, and the output  \n"
             << "    is the conditional average of that quantity constrained to the value of x   \n"
             << " If -w is selected, then a weight is read after each point.                     \n"
-            << " If -as is selected, the final histogram will be smoothed adaptively, with      \n"
-            << "    a smoothing radius going which depends on the central value.                \n"
-            << "    the radius is determined by mode: linear(min,max) interpolates linearly     \n"
-            << "    log(min,max,drad) uses logarithm of the ratio and a sigmoid function        \n"
-            << "    [DEPRECATED]                                                                \n";
+            << " -adaptive uses a simple procedure to adaptively smoothen the histogram as \n"
+            << " it is built, trying to have a relative error of err on the histogram value \n"
+            << " at each point.\n"
+            ;
 }
 
 
@@ -60,16 +60,20 @@ int main(int argc, char **argv)
 
     CLParser clp(argc, argv);
     bool fhelp, fweighted, fgnu, faverage, fhard, fperi;
-    std::string a,b,wb,nbins,asmooth,asfun;
-    unsigned long ndim;
+    std::string a,b,wb,wt,wg1,wg2,wg3,wg5,nbins;
+    unsigned long ndim; double aeps;
     bool fok=
             clp.getoption(ndim,"d") &&
             clp.getoption(a,"xi") &&
             clp.getoption(b,"xf") &&
+            clp.getoption(wt,"t",std::string("")) &&
             clp.getoption(wb,"b",std::string("")) &&
+            clp.getoption(wg1,"g1",std::string("")) &&
+            clp.getoption(wg2,"g2",std::string("")) &&
+            clp.getoption(wg3,"g3",std::string("")) &&
+            clp.getoption(wg5,"g5",std::string("")) &&
             clp.getoption(nbins,"n",std::string("")) &&
-            clp.getoption(asmooth,"as",std::string("")) &&
-            clp.getoption(asfun,"asf",std::string("linear")) &&
+            clp.getoption(aeps,"adaptive",0.) &&
             clp.getoption(fweighted,"w",false) &&
             clp.getoption(faverage,"avg",false) &&
             clp.getoption(fhard,"whard",false) &&
@@ -81,51 +85,34 @@ int main(int argc, char **argv)
 
     std::valarray<HGOptions<Histogram<double> > >hgo(ndim);
     std::valarray<double> va, vb, vw, vn, vasop; std::vector<double> asop;
-    csv2floats(a,va); csv2floats(b,vb); csv2floats(wb,vw); csv2floats(nbins,vn);
+    csv2floats(a,va); csv2floats(b,vb); csv2floats(nbins,vn);
+    HGWindowMode wmode;
+    if (wb!="") { csv2floats(wb,vw); wmode=HGWBox; }
+    else if (wt!="") { csv2floats(wt,vw); wmode=HGWTriangle; }
+    else if (wg1!="") { csv2floats(wg1,vw); wmode=HGWGauss1; }
+    else if (wg2!="") { csv2floats(wg2,vw); wmode=HGWGauss2; }
+    else if (wg3!="") { csv2floats(wg3,vw); wmode=HGWGauss3; }
+    else if (wg5!="") { csv2floats(wg5,vw); wmode=HGWGauss5; }
+    else wmode=HGWDelta;
     std::valarray<double> pva(va), pvb(vb); //extended intervals for periodic
     std::valarray<int> pbin(ndim);
-    //sets up adaptive smoothing (beta)
-    std::string asmode, aspars;
-    if (asmooth.size()>0) {
-      asmode=asmooth.substr(0,asmooth.find("(",0)); aspars=asmooth.substr(asmooth.find("(",0)+1,asmooth.find(")",0)-1-asmooth.find("(",0));
-      csv2floats(aspars,vasop);  for (int i=0; i<vasop.size(); i++) asop.push_back(vasop[i]);
-      if (asmode==std::string("linear")) as_radius=&asr_linear;
-      else if (asmode==std::string("log")) as_radius=&asr_log;
-      else ERROR("Undefined smoothing mode "<<asmode);
-
-      if (asfun==std::string("linear")) as_kernel=&ask_linear;
-      else if (asfun==std::string("square")) as_kernel=&ask_square;
-      else if (asfun==std::string("exp")) as_kernel=&ask_exp;
-      else ERROR("Undefined smoothing function "<<asfun);
-
-          std::cerr<<asfun<<" aops "<<asmode<<" "<<aspars<<"   "<<asop[0]<<"::"<<asop[1]<<"\n";
-    }
 
     if (va.size()!=ndim || vb.size()!=ndim ) ERROR("Boundaries must be given for all dimensions.");
     if ((vn.size()!=ndim && vn.size()!=0)||(vw.size()!=ndim && vw.size()!=0)) ERROR("N. bins and width must be given for all dimensions, if specified.");
     for (int i=0; i<ndim; ++i)
     {
-        hgo[i].window=(vw.size()==0?HGWDelta:HGWTriangle);
+        hgo[i].window=wmode;
+        hgo[i].window_width=(vw.size()==0 || hgo[i].window==HGWDelta?0.:vw[i]);
+
         if (fhard) hgo[i].walls=HGBHard;  //!this should be done per direction.
         else if (fperi) hgo[i].walls=HGBPeriodic;
         else hgo[i].walls=HGBNormal;
-        hgo[i].window_width=(vw.size()==0 || hgo[i].window==HGWDelta?0.:vw[i]);
+
         hgo[i].boundaries.resize((vn.size()==0?101:vn[i]+1));
-        //if (!fperiodic)
-        {
-           for (int k=0; k<hgo[i].boundaries.size();k++)
+        for (int k=0; k<hgo[i].boundaries.size();k++)
              hgo[i].boundaries[k]=va[i]+k*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
-        }
-        /*else
-        {
-           //allocates extra buffer for the tails of the kernels to be folded back into the period
-           pbin[i]=ceil((hgo[i].boundaries.size()-1.0)*hgo[i].window_width/(vb[i]-va[i]));
-           double buf=pbin[i]*(vb[i]-va[i])/(hgo[i].boundaries.size()-1);
-           pva[i]=va[i]-buf; pvb[i]=vb[i]+buf;
-           hgo[i].boundaries.resize(hgo[i].boundaries.size()+2*pbin[i]);
-           for (int k=0; k<hgo[i].boundaries.size();k++)
-             hgo[i].boundaries[k]=pva[i]+k*(pvb[i]-pva[i])/(hgo[i].boundaries.size()-1);
-        }*/
+
+        hgo[i].adaptive_eps = aeps;
     }
 
     NDHistogram<double> HG(hgo);
@@ -152,19 +139,17 @@ int main(int argc, char **argv)
     { std::cout<< "  --  triangle kernel binning:  widths  "; for (int i=0; i<ndim; i++) std::cout<<vw[i]<<"  "; }
     std::cout<<"\n";
     std::cout.setf(std::ios::scientific);
-    if (asmooth=="") {
+
     if (!fgnu) std::cout <<HG;
     else
     {
-        //ALSO PERIODIC ACTUALLY WORKS ONLY IN 2D. TOTALLY NEEDS CLEANING UP AND GENERALIZING!!!
         std::valarray<long> ind(ndim); std::valarray<double> cen(ndim); double val, valy;
-        
-        //if (!fperiodic)
+
         ind = 0;
         while (ind[0]<hgo[0].boundaries.size()-1)
         {
            HG.get_bin(ind,cen,val);
-           // prints out the center of the histogram bin 
+           // prints out the center of the histogram bin
            for (int i=0; i<ndim; i++)
               std::cout<<cen[i]<<"\t";
            if (!faverage)
@@ -178,116 +163,12 @@ int main(int argc, char **argv)
            }
            ind[ndim-1]++;
            for (int i=(ndim-1); i>0; --i)
-              if (ind[i]>=hgo[i].boundaries.size()-1) 
-              { 
+              if (ind[i]>=hgo[i].boundaries.size()-1)
+              {
                  ind[i-1]++; ind[i]=0;
                  if (i==1) std::cout<<"\n"; // newline on outer loop (gnuplot compatibility)
-              }            
-        }   
-        /*
-        for (int i=0; i<hgo[0].boundaries.size()-1; ++i)
-        {
-            for (int j=0; j<hgo[1].boundaries.size()-1; ++j)
-            {
-                ind[0]=i; ind[1]=j;
-
-                if (!faverage)
-                {
-                   HG.get_bin(ind,cen,val);
-                   std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<val<<"\n";
-                }
-                else
-                {
-                   HGY.get_bin(ind,cen,valy);
-                   HG.get_bin(ind,cen,val);
-                   std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<valy/val*ay<<"\n";
-                }
-            }
-            std::cout<<std::endl;
-        }*/
-        
-/*        else
-        {
-        std::valarray<double> pcen(2); double pval;
-        long bs[2];
-        bs[0]=hgo[0].boundaries.size()-1-pbin[0]*2;
-        bs[1]=hgo[1].boundaries.size()-1-pbin[1]*2;
-        for (int i=pbin[0]; i<hgo[0].boundaries.size()-1-pbin[0]; ++i)
-        {
-            for (int j=pbin[1]; j<hgo[1].boundaries.size()-1-pbin[1]; ++j)
-            {
-                ind[0]=i; ind[1]=j;
-                HG.get_bin(ind,cen,val); //this is the centre
-                if (i<pbin[0]*2) {
-                  ind[0]=i+bs[0];
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                  if (j<pbin[1]*2) {
-                  ind[1]=j+bs[1];
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                  }
-                }
-                if (j<pbin[1]*2) {
-                  ind[1]=j+bs[1];  ind[0]=i;
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                }
-                if (i>=bs[0]) {
-                  ind[0]=i-bs[0];
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                  if (j>=bs[1]) {
-                  ind[1]=j-bs[1];
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                  }
-                }
-                if (j>=bs[1]) {
-                  ind[1]=j-bs[1]; ind[0]=i;
-                  HG.get_bin(ind,pcen,pval); val+=pval;
-                }
-
-                std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<val<<"\n";
-            }
-            std::cout<<std::endl;
+              }
         }
-        }*/
-    }
-    } else {
-      if (!fgnu) { ERROR("Multidimensional smoothing not implemented\n"); }
-      else
-      {
 
-        if (ndim!=2) ERROR("GNUPLOT format works only for dimension 2\n");
-
-        std::valarray<long> ind(2); std::valarray<double> cen(2), dcen; double val, asr, dr, tv, w, tw;
-        double maxv=HG.max(), minv=HG.min();  bool breakout=false;
-        asop.push_back(maxv); asop.push_back(minv);
-            std::cerr<<"aops"<<asop[0]<<","<<asop[1]<<","<<asop[2]<<","<<asop[3]<<"\n";
-        for (int i=0; i<hgo[0].boundaries.size()-1; ++i)
-        {
-            for (int j=0; j<hgo[1].boundaries.size()-1; ++j)
-            {
-                ind[0]=i; ind[1]=j;
-                HG.get_bin(ind,cen,val);
-                asr=as_radius(asop,val);
-                //std::cerr<<"Value at center is "<<val<<" & radius "<<asr<<"\n";
-                tw=tv=0.0; breakout=false;
-                for(int di=0; !breakout && di<=((i<hgo[0].boundaries.size()-i-2)?i:hgo[0].boundaries.size()-i-2); di++)
-                   for(int dj=0; dj<=((j<hgo[1].boundaries.size()-j-2)?j:hgo[1].boundaries.size()-j-2); dj++)
-                   {
-                     ind[0]=i+di; ind[1]=j+dj;
-                     HG.get_bin(ind,dcen,val);
-                     dr=sqrt((dcen[0]-cen[0])*(dcen[0]-cen[0])+(dcen[1]-cen[1])*(dcen[1]-cen[1]));
-                     if (dr>asr) { if (dj==0) breakout=true; break; }
-                     w=as_kernel(dr/asr); tw+=w; tv+=val*w;
-                     ind[0]=i-di; ind[1]=j+dj; HG.get_bin(ind,dcen,val); tw+=w; tv+=val*w;
-                     ind[0]=i-di; ind[1]=j-dj; HG.get_bin(ind,dcen,val); tw+=w; tv+=val*w;
-                     ind[0]=i+di; ind[1]=j-dj; HG.get_bin(ind,dcen,val); tw+=w; tv+=val*w;
-                   }
-
-                //std::cerr<<"Smoothened val is "<<tv/tw<<"\n";
-                std::cout<<cen[0]<<"\t"<<cen[1]<<"\t"<<tv/tw<<"\n";
-
-            }
-            std::cout<<std::endl;
-        }
-      }
     }
 }
