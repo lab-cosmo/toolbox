@@ -6,6 +6,7 @@ using namespace toolbox;
 #include <fstream>
 #include <iomanip>
 
+#define PROGRESSSTRIDE 100
 
 
 void banner() 
@@ -14,7 +15,7 @@ void banner()
             << " USAGE: autocorr -maxlag max-lag [-timestep unit-time]                          \n"
             << "                [-drop ndrop] [-coll] [-runlength lr] [-stride std]             \n"
             << "                [-mean exact_mean] [-sigma exact-sigma] [-s]                    \n"
-            << "                [-tau exact_tau] [-tau2 exact-tau2] [-h] [-q]                   \n"
+            << "                [-tau exact_tau] [-tau2 exact-tau2] [-h] [-v]                   \n"
             << "                [< in | -input file1 file2 ...] > out                           \n"
             << " compute the autocorrelation function of a series of real data points given in  \n"
             << " standard input. the mean and sigma used to compute and normalize the ACF can   \n"
@@ -24,7 +25,8 @@ void banner()
             << " if -coll is specified, series are collapsed when finished to save memory.      \n"
             << " the error is computed from the integral of the ACF^2, which can be given as    \n"
             << " input. if the -s option is selected, the code writes only mean, sigma, tau and \n"
-            << " tau2 on a single line, then exit. -q avoids any progress output on stderr.     \n"
+            << " tau2 on a single line, then exit. -v enables verbose output on stderr,         \n"
+            << " including progress output.                                                     \n"
             << "                                                                                \n";
 }
 
@@ -35,7 +37,7 @@ int main(int argc, char **argv)
     
     CLParser clp(argc, argv);
 
-    bool fhelp, fshort, fquiet, fcoll;
+    bool fhelp, fshort, fverbose, fcoll;
     std::vector<std::string> datafiles;
     unsigned long ncorr, ndrop, runl, stride;
     bool fok=
@@ -55,10 +57,10 @@ int main(int argc, char **argv)
             clp.getoption(acopts.f_exact_mean,"mean",false) &&
             clp.getoption(acopts.xmean,"mean",0.) &&
             clp.getoption(fhelp,"h",false) &&
-            clp.getoption(fquiet,"q",false) &&
+            clp.getoption(fverbose,"v",false) &&
             clp.getoption(fshort,"s",false);
     
-    if ( fhelp || ! fok) { banner(); return 0; }
+    if ( fhelp || ! fok || ! clp.chkunknown(true)) { banner(); return 0; }
     if (stride==0) stride=1;
     AutoCorrelation<double> AC(ncorr, acopts);
 
@@ -68,16 +70,18 @@ int main(int argc, char **argv)
         while (std::cin>>val) {
             if (idata==0 && cseries>0) AC.series_next();
             if (++idata>ndrop && (idata-ndrop-1)%stride==0) AC<<val; 
+            if (fverbose && idata%PROGRESSSTRIDE==0) std::cerr << " Read: "<< std::setw(15)<< idata<<" data points on data series "<<std::setw(8)<<cseries+1<<".\r";
             if (runl>0 && idata%runl==0)
             {
                 idata=0; cseries++; 
+                if (fverbose) std::cerr << " Collapsing data from series...\n";
                 if (fcoll && cseries>1) AC.series_collapse();
             }
         }
     }
     else
     {
-        if (!fquiet) std::cerr << "Input data from file(s)\n";
+        if (fverbose) std::cerr << " Input data from file(s)\n";
         std::vector<std::string>::iterator it=datafiles.begin();
         while (it!=datafiles.end())
         {
@@ -85,25 +89,29 @@ int main(int argc, char **argv)
             std::ifstream ifile((*it).c_str());
             idata=0;
             while (ifile>>val) if (++idata>ndrop && (idata-ndrop-1)%stride==0) AC<<val;
-            if (!fquiet) std::cerr << "Read " <<std::setw(10)<<(idata-ndrop)<<" items from "<<(*it)<<".\n";
+            if (fverbose) std::cerr << " Read " <<std::setw(10)<<(idata-ndrop)<<" items from file "<<(*it)<<".\r";
             ++it; ++cseries;
             ifile.close();
             if (fcoll && cseries>1) 
             {
-                if (!fquiet) std::cerr << "Collapsing data from series...\n";
+                if (fverbose) std::cerr << " Collapsing data from series...\n";
                 AC.series_collapse();
             }
         }
     }
+    
+    if (fverbose) std::cerr << " Finished reading. Now computing ACF and outputting ...\n";
     double mean=AC.mean(), sigma=AC.sigma(), tau=AC.actime();
     std::cout.precision(8); std::cout.setf(std::ios::scientific); 
     std::cout<<(fshort?"":"# ")
             <<std::setw(15)<<mean<<" "
             <<std::setw(15)<<sigma<<" "
             <<std::setw(15)<<tau<<" "
-            <<std::setw(15)<<AC.actime2()<<"\n";
+            <<std::setw(15)<<AC.actime2()
+            <<std::setw(15)<<(sigma/sqrt(AC.samples()*acopts.timestep*0.5/tau))<<" "
+            <<"\n";
     if (fshort) return 0;
-    std::cout<<"# ^  mean  ^ . ^  sigma ^ . ^   tau  ^ . ^  tau2  ^ .                              \n";
+    std::cout<<"# ^  mean  ^ . ^  sigma ^ . ^   tau  ^ . ^  tau2  ^ . ^  error  ^ .                       \n";
     std::cout.precision(7); std::cout.setf(std::ios::scientific);
     std::cout<<"################################################################################\n";
     std::cout<<"#  autocorrelation function computed from "<<std::setw(12)<<AC.samples()<<" samples                   #\n";
@@ -126,6 +134,8 @@ int main(int argc, char **argv)
     
     std::cout.precision(6);
     std::valarray<double> t,v,b,ev,eb;
+    
+    if (fverbose) std::cerr << " Writing ACF and blocking analysis data ...\n";    
     AC.fullanalysis(t,v,b,ev,eb);
     for (unsigned long i=0; i<ncorr; ++i)
     {

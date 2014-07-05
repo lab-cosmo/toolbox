@@ -799,22 +799,25 @@ void NDHistogram<U>::add(const std::valarray<U>& pnel, double weight)
         else for (;j<nbin[i]&&tbins[i][j]!=0.;) ++j;
         maxp[i]=j;
     }
+    
+    // we use a vector of indices to perform ndim nested loops
     std::valarray<long> cp(minp);
     while (cp[dim-1]<maxp[dim-1])
     {
         int j;
 
-        long k=c2b(cp);
+        long k=c2b(cp); // get the index of the bin corresponding to the current set of indices
         double tv=1.; for (i=0; i<dim; ++i) tv*=tbins[i][cp[i]];
         bins[k]+=tv/vols[k]*weight;
         outs-=tv;
 
+        // increment the bin index
         cp[0]++;
         for (i=0; i<dim-1; ++i)
         {
             // in periodic binning, we can at least try to skip zero ranges here
             if (opts[i].walls==HGBPeriodic) while(cp[i]<maxp[i] && tbins[i][cp[i]] == 0.0) cp[i]++;
-            if (cp[i]>=maxp[i]) {cp[i]=minp[i]; ++cp[i+1];}
+            if (cp[i]>=maxp[i]) {cp[i]=minp[i]; ++cp[i+1];} // wrap around
         }
     }
     outliers+=outs*weight;
