@@ -6,7 +6,10 @@
 #include "tools-histogram.hpp"
 #include "tools-autocorr.hpp"
 #include "fftw3.h"
+#include<complex>
 #include<fstream>
+#include <math.h>
+#define _USE_MATH_DEFINES
 //ooops! beware, this requires extensions to STL. should program with conditional compilation
 //#define __USEREGEX 1
 #ifdef __USEREGEX
@@ -26,6 +29,7 @@ bool chk_sel(const std::string& label, const std::string& regex)
 #include "matrix-full.hpp"
 #include "matrix-io.hpp"
 #include "ioparser.hpp"
+
 using namespace toolbox;
 void inline micdo(const double& a, double &d)
 {
@@ -312,6 +316,7 @@ void banner()
             << " -fstep    use just a frame every fstep frames in input                         \n"
             << " -ixyz     input is an xyz trajectory. velocities might be read as 4,5,6 field  \n"
             << " -idlp     input is a DLPOLY HISTORY file                                       \n"
+            << " -ixtc     input is a xtc format, a portable format for trajectories           \n"
             << " -ref      reads reference for alignment, etc. from the given file              \n"
             << " -box file reads cell parameters from file ( axx axy axz\n ayx ayy ... )        \n"
             << " -qat file reads atomic charges from file ( label q1 \n label q2  ... )         \n"
@@ -326,6 +331,9 @@ void banner()
             << " -gr2      label of the second specie [*]                                       \n"
             << " -grmax    maximum distance to compute g(r) [5]                                 \n"
             << " -grbins   number of bins in the histogram for g(r) [100]                       \n"
+            << " ## pos OPTIONS:   activate by -pos                                             \n"
+            << " -type     label of the first specie [*]                                        \n"
+            << " -rat      label of the second specie [*]                                       \n"
             << " ## order parameter OPTIONS: activate by -cv                                    \n"
             << " -cvat     atom types to compute cv for [*]                                     \n"
             << " -cvtype   index of cv type [1]                                                 \n"
@@ -368,6 +376,7 @@ void banner()
             << " ## projected momentum ( -pproj )                                               \n"
             << " -ppat1     label of the monitored specie [*]                                   \n"
             << " -ppat2     label of specie to look for nearest bond [*]                        \n"
+            << " ## converts a xtc file to xyz file (-xtc2xyz)                                  \n"
             << " ## thermal ellipsoid tensor ( -thermal )                                       \n"            //may want to include options for center of mass removal and Berry phase
             ;
 }
@@ -376,11 +385,12 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
-    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
+    bool fgdr=false, fpos=false, fxtc2xyz=false, fvvac=false, fxyz=false, fdlp=false, fxtc=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    std::string lgdr1, lgdr2, ltype, lrat, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
+    
     bool fok=
             //general options
             clp.getoption(prefix,"o",std::string("")) &&
@@ -389,8 +399,9 @@ int main(int argc, char **argv)
             clp.getoption(fstop,"fstop",(unsigned long) 0) &&
             clp.getoption(funwrap,"unwrap",false) &&
             clp.getoption(fstep,"fstep",(unsigned long) 0) &&
-            clp.getoption(fxyz,"ixyz",true) &&
+            clp.getoption(fxyz,"ixyz",false) &&
             clp.getoption(fdlp,"idlp",false) &&
+            clp.getoption(fxtc,"ixtc",false) &&
             clp.getoption(fref,"ref",std::string("")) &&
             clp.getoption(fbox,"box",std::string("")) &&
             clp.getoption(fqat,"qat",std::string("")) &&
@@ -405,6 +416,10 @@ int main(int argc, char **argv)
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
             clp.getoption(gdrbins,"grbins",(unsigned long)100) &&
+            //pos options
+            clp.getoption(fpos,"pos",false) &&            
+            clp.getoption(ltype,"type",std::string("*")) &&
+            clp.getoption(lrat,"rat",std::string("*")) &&
             //vvacf options
             clp.getoption(fvvac,"vvac",false) &&
             clp.getoption(fvvacbox,"vvftbox",false) &&
@@ -460,6 +475,8 @@ int main(int argc, char **argv)
             //dipole options
             clp.getoption(fdipole,"dpl",false) &&
             clp.getoption(fhelp,"h",false)&&
+            //xtc2xyz options
+            clp.getoption(fxtc2xyz,"xtc2xyz",false) &&  
             //thermal ellipsoids options
             clp.getoption(fthermal,"thermal",false)
             ;
@@ -571,13 +588,13 @@ int main(int argc, char **argv)
     FMatrix<double> te_u0, te_uiuj;
 
     //initializes output streams
-    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
+    std::ostream *ogdr, *opos, *oxtc2xyz, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
     std::cout.precision(8); std::cout.width(15); std::cout.setf(std::ios::scientific);
 
     if (prefix=="")
     {
         //everything goes to stdout
-        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=&std::cout;
+        ocv=ogdr=opos=oxtc2xyz=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=&std::cout;
     }
     else
     {
@@ -585,6 +602,16 @@ int main(int argc, char **argv)
         {
             ogdr=new std::ofstream((prefix+std::string(".gdr")).c_str());
             (*ogdr).precision(8); (*ogdr).width(15); (*ogdr).setf(std::ios::scientific);
+        }
+        if (fpos)
+        {
+            opos=new std::ofstream((prefix+std::string(".pos.xyz")).c_str());
+            (*opos).precision(8); (*opos).width(15); (*opos).setf(std::ios::scientific);
+        }
+        if (fxtc2xyz)
+        {
+            oxtc2xyz=new std::ofstream((prefix+std::string(".xtc.xyz")).c_str());
+            (*oxtc2xyz).precision(8); (*oxtc2xyz).width(15); (*oxtc2xyz).setf(std::ios::scientific);
         }
         if (fcv)
         {
@@ -698,9 +725,9 @@ int main(int argc, char **argv)
     if (fbox!="") ifbox.open(fbox.c_str());
     if (fweights!="") ifweights.open(fweights.c_str());
     ffirstcell=true;    
-    while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
+    while ((fdlp && ReadDLPFrame(std::cin,af))||(fxtc && ReadXTCFrame(stdin,af)) || (fxyz && ReadXYZFrame(std::cin,af))  )
     {
-        ++nfr;
+        ++nfr; 
         if (fstop!=0 && nfr>fstop)  break;
         // reads anyway box and weights, as they are meant to span the whole trajectory
         if (fbox!="" and (fvbox || ffirstcell) )
@@ -731,10 +758,11 @@ int main(int argc, char **argv)
         {
             fhavecell=true;
             if (fbox!="") {  CM = CBOX;  }
-            else if (fdlp) { af2cm(af,CM); }        
+            else if (fdlp) { af2cm(af,CM); }   
+            else if (fxtc) { af2cm(af,CM); } 
             else fhavecell=false;
             if (fhavecell)
-            {
+            {  
                 MatrixInverse(CM,ICM);
 
                 cvolume=fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
@@ -747,16 +775,29 @@ int main(int argc, char **argv)
                 std::ifstream ifref(fref.c_str()); bool succ;
                 if (fdlp) succ=ReadDLPConf(ifref,reffr);
                 else if (fxyz) succ=ReadXYZFrame(ifref,reffr);
+                else if (fxtc) { 
+                    // assumes the reference is in XYZ format to get quick access to atom labels
+                    succ=ReadXYZFrame(ifref,reffr);                                        
+                }
                 else ERROR("I don't know how to read this...");
 
-                if (!succ) ERROR("Format error in ref file.");
-                if (reffr.ats.size()!=af.ats.size()) ERROR("Atom number mismatch between reference and trajectory frames!");
+                if (!succ) ERROR("Format error in ref file.");                
+                if (reffr.ats.size()!=af.ats.size()) ERROR("Atom number mismatch between reference and trajectory frames!");                
             }
+        } 
+        
+        if (fxtc) 
+        { 
+            if (fref=="") ERROR("You must specify a reference frame to get atom names when reading XTC input");
+            // get atom names from reference frame
+
+            for( int i=0 ; i<af.ats.size(); ++i ) af.ats[i].name=reffr.ats[i].name;        
         }
         if (fvbox)
         {
             if (fbox!="") { CM = CBOX; }
             else if (fdlp) { af2cm(af,CM); }
+            else if (fxtc) { af2cm(af,CM); }
             MatrixInverse(CM,ICM);
             //updates the average volume
             cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
@@ -1176,6 +1217,78 @@ int main(int argc, char **argv)
                 hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
             }
             ngdrpairs+=al1.size()*al2.size()*statweight;   // potential number of pairs in the cell volume
+        }
+        double dlx[35000];
+        double dly[35000];
+        double dlz[35000];
+        
+        if (fpos)
+        {
+    std::complex<double> berryx, berryy, berryz;
+    double stempx, stempy, stempz;
+    double al1smx, al1smy, al1smz, al1mx, al1my, al1mz, natms, grecopi;
+    
+            grecopi=0.5/M_PI;
+            if (!fhavecell) ERROR("You must provide cell data in order to compute pos!");
+            al1.clear(); al2.clear();
+            if (ltype=="*") al1=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
+                if (af.ats[i].name==ltype) al1.push_back(af.ats[i]);
+            if (lrat=="*") al2=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
+                if (af.ats[i].name==lrat) al2.push_back(af.ats[i]);
+            // int sizeal2=al2.size();
+            berryx=berryy=berryz=0.0;
+            for (unsigned long i=0; i<al1.size(); ++i)
+            {   
+                stempx=2.0*M_PI*(al1[i].x / af.nprops["axx"]);
+                stempy=2.0*M_PI*(al1[i].y / af.nprops["ayy"]);
+                stempz=2.0*M_PI*(al1[i].z / af.nprops["azz"]);
+                std::cerr<<i<<","<<al1[i].z<<","<<stempz<<","<<std::exp(std::complex<double>(0.0,stempz))<<"\n";
+
+
+                berryx=berryx+std::exp(std::complex<double>(0.0,stempx));
+                berryy=berryy+std::exp(std::complex<double>(0.0,stempy));
+                berryz=berryz+std::exp(std::complex<double>(0.0,stempz));
+                
+            }
+            natms=1.0/ al1.size();
+            al1smx=grecopi*std::arg(berryx * natms);
+            al1smy=grecopi*std::arg(berryy * natms);
+            al1smz=grecopi*std::arg(berryz * natms);
+            al1mx= af.nprops["axx"]*al1smx;
+            al1my= af.nprops["ayy"]*al1smy;
+            al1mz= af.nprops["azz"]*al1smz;
+            std::cerr<<" al "<<al1mx<<","<<al1my<<","<<al1mz<<"\n";
+            std::cerr<<" al "<<al1smx<<","<<al1smy<<","<<al1smz<<"\n";
+            for (unsigned long j=0; j<al2.size(); ++j)
+            {                
+                dlx[j]=al2[j].x-al1mx;
+                dly[j]=al2[j].y- al1my;
+                dlz[j]=al2[j].z-al1mz;
+                micmat(ICM,dx,dy,dz);
+                micpbc(1.,1.,1.,dx,dy,dz);
+                micmat(CM,dx,dy,dz);
+            }
+            // std::cout<<stempx<<" "<<stempy<<" "<<stempz<<" "<<M_PI<<"\n";
+        }
+        if (fxtc2xyz)
+        {
+                (*oxtc2xyz) << af.ats.size()<<"\nOutput from xtc to xyz\n";
+                for (unsigned long i=0; i<af.ats.size(); ++i)
+                {
+                    (*oxtc2xyz)<<af.ats[i].name<<" "<<af.ats[i].x<<" "<<af.ats[i].y<<" "<<af.ats[i].z<<" "<<std::endl;
+                }
+        }
+        
+        if (fpos)
+        {
+                (*opos) << al2.size()<<"\nOutput from pos routine\n";
+                for (unsigned long i=0; i<al2.size(); ++i)
+                {
+                    (*opos)<<al2[i].name<<" "<<dlx[i]<<"  "<<dly[i]<<"  "<<dlz[i]<<std::endl;
+                }
+               // delete [] dlx, dly, dlz;
         }
         if (fvvac)
         {

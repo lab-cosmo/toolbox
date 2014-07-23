@@ -26,12 +26,19 @@ struct AtomFrame {
     std::vector<AtomData> ats;
     std::vector<double> props;
     std::map<std::string,double> nprops;
+
+    
+    
 };
 
 void ReadXYZ(std::istream& istr, std::vector<AtomFrame>& frames);
 bool ReadXYZFrame(std::istream& istr, AtomFrame& frames);
 bool ReadDLPFrame(std::istream& istr, AtomFrame& frames);
 bool ReadDLPConf(std::istream& istr, AtomFrame& frame);
+bool ReadPDBFrame(std::ostream& ostr, AtomFrame& frame);
 bool WritePDBFrame(std::ostream& ostr, AtomFrame& frame);
+bool ReadXTCFrame(FILE *ifile, AtomFrame& frames);
+//bool WriteXTCFrame(std::istream& istr, AtomFrame& frames);
+
 }; //ends namespace toolbox
 #endif //ends ifdef __IOATOMS_H

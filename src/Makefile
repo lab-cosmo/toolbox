@@ -3,6 +3,8 @@ all:   tools libs
 clean:
 	$(MAKE) -C tools clean
 	$(MAKE) -C libs clean
+
+
 tools:	libs
 	$(MAKE) -C tools all
 libs:
