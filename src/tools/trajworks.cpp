@@ -786,7 +786,7 @@ int main(int argc, char **argv)
             }
         } 
         
-        if (fxtc) 
+        if (fxtc || (fxyz && fref!="")) 
         { 
             if (fref=="") ERROR("You must specify a reference frame to get atom names when reading XTC input");
             // get atom names from reference frame
@@ -1241,10 +1241,13 @@ int main(int argc, char **argv)
             berryx=berryy=berryz=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
             {   
-                stempx=2.0*M_PI*(al1[i].x / af.nprops["axx"]);
-                stempy=2.0*M_PI*(al1[i].y / af.nprops["ayy"]);
-                stempz=2.0*M_PI*(al1[i].z / af.nprops["azz"]);
-                std::cerr<<i<<","<<al1[i].z<<","<<stempz<<","<<std::exp(std::complex<double>(0.0,stempz))<<"\n";
+                
+                dx=al1[i].x; dy=al1[i].y; dz=al1[i].z;  
+                micmat(ICM,dx,dy,dz);
+                stempx=2.0*M_PI*dx;
+                stempy=2.0*M_PI*dy;
+                stempz=2.0*M_PI*dz;
+                //std::cerr<<i<<","<<al1[i].z<<","<<stempz<<","<<std::exp(std::complex<double>(0.0,stempz))<<"\n";
 
 
                 berryx=berryx+std::exp(std::complex<double>(0.0,stempx));
@@ -1253,22 +1256,19 @@ int main(int argc, char **argv)
                 
             }
             natms=1.0/ al1.size();
-            al1smx=grecopi*std::arg(berryx * natms);
-            al1smy=grecopi*std::arg(berryy * natms);
-            al1smz=grecopi*std::arg(berryz * natms);
-            al1mx= af.nprops["axx"]*al1smx;
-            al1my= af.nprops["ayy"]*al1smy;
-            al1mz= af.nprops["azz"]*al1smz;
-            std::cerr<<" al "<<al1mx<<","<<al1my<<","<<al1mz<<"\n";
-            std::cerr<<" al "<<al1smx<<","<<al1smy<<","<<al1smz<<"\n";
+            al1mx=grecopi*std::arg(berryx * natms);
+            al1my=grecopi*std::arg(berryy * natms);
+            al1mz=grecopi*std::arg(berryz * natms);
+            micmat(CM,al1mx,al1my,al1mz);
             for (unsigned long j=0; j<al2.size(); ++j)
             {                
                 dlx[j]=al2[j].x-al1mx;
-                dly[j]=al2[j].y- al1my;
+                dly[j]=al2[j].y-al1my;
                 dlz[j]=al2[j].z-al1mz;
-                micmat(ICM,dx,dy,dz);
-                micpbc(1.,1.,1.,dx,dy,dz);
-                micmat(CM,dx,dy,dz);
+                micmat(ICM,dlx[j],dly[j],dlz[j]);
+                micpbc(1.,1.,1.,dlx[j],dly[j],dlz[j]);
+                micmat(CM,dlx[j],dly[j],dlz[j]);
+                
             }
             // std::cout<<stempx<<" "<<stempy<<" "<<stempz<<" "<<M_PI<<"\n";
         }
