@@ -391,6 +391,7 @@ int main(int argc, char **argv)
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
     
+    
     bool fok=
             //general options
             clp.getoption(prefix,"o",std::string("")) &&
@@ -1218,15 +1219,14 @@ int main(int argc, char **argv)
             }
             ngdrpairs+=al1.size()*al2.size()*statweight;   // potential number of pairs in the cell volume
         }
-        double dlx[35000];
-        double dly[35000];
-        double dlz[35000];
-        
+       
+        std::vector<double> dlx, dly, dlz;
+         
         if (fpos)
         {
-    std::complex<double> berryx, berryy, berryz;
-    double stempx, stempy, stempz;
-    double al1smx, al1smy, al1smz, al1mx, al1my, al1mz, natms, grecopi;
+            std::complex<double> berryx, berryy, berryz;
+            double stempx, stempy, stempz;
+            double al1smx, al1smy, al1smz, al1mx, al1my, al1mz, natms, grecopi;
     
             grecopi=0.5/M_PI;
             if (!fhavecell) ERROR("You must provide cell data in order to compute pos!");
@@ -1241,7 +1241,7 @@ int main(int argc, char **argv)
             berryx=berryy=berryz=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
             {   
-                
+
                 dx=al1[i].x; dy=al1[i].y; dz=al1[i].z;  
                 micmat(ICM,dx,dy,dz);
                 stempx=2.0*M_PI*dx;
@@ -1262,6 +1262,9 @@ int main(int argc, char **argv)
             micmat(CM,al1mx,al1my,al1mz);
             for (unsigned long j=0; j<al2.size(); ++j)
             {                
+                dlx.resize(al2.size());
+                dly.resize(al2.size());
+                dlz.resize(al2.size());
                 dlx[j]=al2[j].x-al1mx;
                 dly[j]=al2[j].y-al1my;
                 dlz[j]=al2[j].z-al1mz;
@@ -1288,7 +1291,6 @@ int main(int argc, char **argv)
                 {
                     (*opos)<<al2[i].name<<" "<<dlx[i]<<"  "<<dly[i]<<"  "<<dlz[i]<<std::endl;
                 }
-               // delete [] dlx, dly, dlz;
         }
         if (fvvac)
         {
