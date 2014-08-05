@@ -14,7 +14,7 @@ void banner()
     std::cerr
             << " USAGE: autocorr -maxlag max-lag [-timestep unit-time]                          \n"
             << "                [-drop ndrop] [-coll] [-runlength lr] [-stride std]             \n"
-            << "                [-mean exact_mean] [-sigma exact-sigma] [-s]                    \n"
+            << "                [-mean exact_mean] [-sigma exact-sigma] [-s] [-raw]             \n"
             << "                [-tau exact_tau] [-tau2 exact-tau2] [-h] [-v]                   \n"
             << "                [< in | -input file1 file2 ...] > out                           \n"
             << " compute the autocorrelation function of a series of real data points given in  \n"
@@ -26,7 +26,7 @@ void banner()
             << " the error is computed from the integral of the ACF^2, which can be given as    \n"
             << " input. if the -s option is selected, the code writes only mean, sigma, tau and \n"
             << " tau2 on a single line, then exit. -v enables verbose output on stderr,         \n"
-            << " including progress output.                                                     \n"
+            << " including progress output. -raw prints non-normalized ACF.                     \n"
             << "                                                                                \n";
 }
 
@@ -37,7 +37,7 @@ int main(int argc, char **argv)
     
     CLParser clp(argc, argv);
 
-    bool fhelp, fshort, fverbose, fcoll;
+    bool fhelp, fshort, fverbose, fcoll, fraw;
     std::vector<std::string> datafiles;
     unsigned long ncorr, ndrop, runl, stride;
     bool fok=
@@ -46,6 +46,7 @@ int main(int argc, char **argv)
             clp.getoption(runl,"runlength",(unsigned long) 0) &&
             clp.getoption(stride,"stride",(unsigned long) 1) &&
             clp.getoption(fcoll,"coll",false) &&
+            clp.getoption(fraw,"raw",false) && 
             clp.getoption(datafiles,"input",std::vector<std::string>(0)) &&
             clp.getoption(acopts.timestep,"timestep",1.) &&
             clp.getoption(acopts.f_exact_sigma,"sigma",false) &&
@@ -122,6 +123,8 @@ int main(int argc, char **argv)
         std::cout<<"#  computed with exact sigma:  "<<std::setw(12)<<acopts.xsigma<<"                                      #\n";
     if (acopts.f_exact_tau2)
         std::cout<<"#  computed with exact tau2:   "<<std::setw(12)<<acopts.xtau2<<"                                      #\n";
+    if (fraw) 
+        std::cout<<"#  non-normalized autocorrelation output                                       #\n";
     std::cout<<"# **************************************************************************** #\n";
     std::cout<<"#  mean:      "<<std::setw(12)<<mean
             <<" ± "<<
@@ -137,6 +140,7 @@ int main(int argc, char **argv)
     
     if (fverbose) std::cerr << " Writing ACF and blocking analysis data ...\n";    
     AC.fullanalysis(t,v,b,ev,eb);
+    if (fraw) v*=(sigma*sigma);
     for (unsigned long i=0; i<ncorr; ++i)
     {
         std::cout <<std::setw(12)<< t[i]<<" "
