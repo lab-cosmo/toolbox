@@ -4,7 +4,7 @@ LDFLAGS=-L../libs -ltoolbox
 SOURCES=$(shell ls *.cpp)
 OBJECTS=$(SOURCES:.cpp=.o)
 DEPENDS=$(SOURCES:.cpp=.d)
-TOOLS=autocorr crosscorr gaussmix histogram ndhistogram trajworks fourier
+TOOLS=autocorr crosscorr gaussmix histogram ndhistogram trajworks fourier trjgrapholo
 .PHONY: all clean $(TOOLS)
 
 CXXFLAGS:=$(CXXFLAGS) -I../libs
@@ -20,6 +20,9 @@ all: $(TOOLS)
 trajworks.o: trajworks.cpp trajworks.d
 	$(CXX) -c $(DREGEX) $(CXXFLAGS) -o $@ $<
 
+trjgrapholo.o: trjgrapholo.cpp trjgrapholo.d
+	$(CXX) -c $(DREGEX) $(CXXFLAGS) -o $@ $<
+
 clean:
 	rm -f $(OBJECTS) $(DEPENDS)
 
@@ -30,3 +33,7 @@ $(TOOLS:%=../../bin/%): ../../bin/%: %.o
 
 ../../bin/trajworks: trajworks.o
 	$(CXX) $(CXXFLAGS) -o $@ $< $(TBLDFLAGS) 
+
+../../bin/trajworks: trjgrapholo.o
+	$(CXX) $(CXXFLAGS) -o $@ $< $(TBLDFLAGS)
+

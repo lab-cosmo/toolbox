@@ -13,11 +13,11 @@
 
 namespace toolbox {
 struct AtomData {
-    std::string name;
+    std::string name, molname, group;
     double x, y, z;
     std::vector<double> props;
     std::map<std::string,double> nprops;
-    AtomData() : name(""), x(0.), y(0.), z(0.), props(0),  nprops() {}
+    AtomData() : name(""), x(0.), y(0.), z(0.), molname, group, props(0),  nprops() {}
 };
 
 struct AtomFrame {
@@ -35,7 +35,7 @@ void ReadXYZ(std::istream& istr, std::vector<AtomFrame>& frames);
 bool ReadXYZFrame(std::istream& istr, AtomFrame& frames);
 bool ReadDLPFrame(std::istream& istr, AtomFrame& frames);
 bool ReadDLPConf(std::istream& istr, AtomFrame& frame);
-bool ReadPDBFrame(std::ostream& ostr, AtomFrame& frame);
+bool ReadPDBFrame(std::istream& istr, AtomFrame& frames);
 bool WritePDBFrame(std::ostream& ostr, AtomFrame& frame);
 bool ReadXTCFrame(FILE *ifile, AtomFrame& frames);
 //bool WriteXTCFrame(std::istream& istr, AtomFrame& frames);
