@@ -9,7 +9,7 @@ void banner()
     std::cerr
             << " USAGE: histogram -xi xi -xf xf [-n nbins] [-whard|-wnorm|-wperi] [-w] [-avg]  \n"
             << "                  [(-b box-w|-t tri-w|-g1 g1-w|-g2 g2-w|-g3 g3-w|-g5 g5-w)]      \n"
-            << "                  [-adaptive err]                                               \n"
+            << "                  [-adaptive err] [-raw]                                         \n"
             << " compute the histogram of a series of data, with nbins (default:100) bins       \n"
             << " distributed evenly between xi and xf. optionally, box (b), triangular (t)  \n"
             << " or Gaussian (-g?) smoothing functions can be used.                         <n"
@@ -19,9 +19,9 @@ void banner()
             << " of y will be evaluated as a function of x, in a binned fashion.              \n"
             << " [-whard] states that hard walls should be used (i.e. density won't spillout if\n"
             << " the data point is inside the interval. [-wperi] uses periodic boundaries.    \n"
-            << " -adaptive uses a simple procedure to adaptively smoothen the histogram as \n"
+            << " [-adaptive] uses a simple procedure to adaptively smoothen the histogram as \n"
             << " it is built, trying to have a relative error of err on the histogram value \n"
-            << " at each point.\n"
+            << " at each point. [-raw] does not normalize the histogram to one. \n"
             ;
 
 }
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     HGOptions<Histogram<double> > hgopts;
 
     CLParser clp(argc, argv);
-    bool fhelp, fweighted, faverage, fhard, fnorm, fperi;
+    bool fhelp, fweighted, faverage, fhard, fnorm, fperi, fraw;
     double a,b,wb,wt,wg1,wg2,wg3,wg5,aeps;
     unsigned long nbins;
     bool fok=
@@ -50,6 +50,7 @@ int main(int argc, char **argv)
             clp.getoption(fhard,"whard",false) &&
             clp.getoption(fnorm,"wnorm",false) &&
             clp.getoption(fperi,"wperi",false) &&
+            clp.getoption(fraw,"raw",false) &&
             clp.getoption(fhelp,"h",false);
 
     if ( fhelp || ! fok) { banner(); return 0; }
@@ -103,15 +104,22 @@ int main(int argc, char **argv)
 
    std::cout.precision(12);
    std::cout.setf(std::ios::scientific);
-   std::cout.width(14);
+   std::cout.width(14); 
+   std::valarray<double> wx, ww, wf, wy;
+   HG.get_bins(wx,ww,wf);
+   double wnorm=1.0;
+   if (fraw) wnorm=HG.get_totweight();
    if (faverage)
    {
-        std::valarray<double> wx, ww, wf, wy;
         HG.get_bins(wx,ww,wf);
         HGY.get_bins(wx,ww,wy);
         double ay=ty/ny;
         for (unsigned int i=0; i<wx.size(); ++i)
-            std::cout<<wx[i]<<" "<<wy[i]/wf[i]*ay<<" "<<wf[i]<<" "<<ww[i]<<"\n";
+            std::cout<<wx[i]<<" "<<wy[i]/wf[i]*ay<<" "<<wf[i]*wnorm<<" "<<ww[i]<<"\n";
    }
-   else std::cout <<HG;
+   else 
+   {
+        for (unsigned int i=0; i<wx.size(); ++i)
+            std::cout<<wx[i]<<" "<<wf[i]*wnorm<<" "<<ww[i]<<"\n";
+   }
 }
