@@ -492,7 +492,8 @@ int main(int argc, char **argv)
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
 
     //MSD stuff
-    unsigned long imsd=0, msdnat=0; std::valarray<unsigned long> nmsd(msdlag); AtomFrame refmsd;
+    unsigned long imsd=0, msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
+    std::valarray<AtomFrame> msdbuff(msdlag);
     std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; std::valarray<bool> fmsd_inc;
 
     //density histograms
@@ -1211,30 +1212,37 @@ int main(int argc, char **argv)
         }
         if (fmsd)
         {
-            //if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER
-            if (imsd%msdlag==0)
-            {
-                if (imsd==0)
-                {
+            
+            if (npfr==1){ // mark the species to be used
+                          // to compute the MSD
+                if (imsd==0){
                     fmsd_inc.resize(af.ats.size()); fmsd_inc=false;
                     if (lmsd=="*") { fmsd_inc=true; msdnat=af.ats.size(); }
                     else for(unsigned long i=0; i<af.ats.size(); ++i)
-                        if(af.ats[i].name==lmsd) { fmsd_inc[i]=true; msdnat++; }
+                        if(af.ats[i].name==lmsd){ 
+                            fmsd_inc[i]=true; msdnat++; 
+                        }
                 }
-                imsd=0; refmsd=af;
             }
-            nmsd[imsd]++;
-            double cmsd=0.;
-            if (af.ats.size()!=refmsd.ats.size()) ERROR("Atoms number changed during msd calculation");
-            for (unsigned long i=0; i<af.ats.size(); ++i) if (fmsd_inc[i])
-            {
-                dx=af.ats[i].x-refmsd.ats[i].x;
-                dy=af.ats[i].y-refmsd.ats[i].y;
-                dz=af.ats[i].z-refmsd.ats[i].z;
-                cmsd+=dx*dx+dy*dy+dz*dz;
-            }
-            dmsd[imsd]+=cmsd;
-            imsd++;
+            
+            // fill the buffer
+            msdbuff[(npfr-1)%msdlag] = af;
+            if((npfr-1)<(msdlag-1)) continue;
+            
+            // compute the avg MSD
+            imsd = (npfr-1)-(msdlag-1);
+            for (unsigned long j=0; j<msdlag; ++j) {
+                double cmsd=0.;
+                for (unsigned long o=0; o<af.ats.size(); ++o) if (fmsd_inc[o]) {
+                    dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
+                    dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
+                    dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
+                    cmsd+=dx*dx+dy*dy+dz*dz;
+                }
+                dmsd[j]+=cmsd;
+                nmsd[j]++;
+                }
+            
         }
         if (fdipole)
         {
@@ -1376,11 +1384,30 @@ int main(int argc, char **argv)
     }
     if (fmsd)
     {
+        // finishing to average what I can still average
+        for (unsigned long ts=0; ts<msdlag; ++ts) {
+            ++imsd;
+            std::cerr<<  "Finishing to average the MSD "<<std::setw(10)<<std::setiosflags(std::ios::right)<<imsd<<"\r";
+            for (unsigned long j=0; j<msdlag; ++j) {
+                    if ((imsd+j)>(npfr-1)) break;
+                    double cmsd=0.;
+                    for (unsigned long o=0; o<af.ats.size(); ++o) {
+                        dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
+                        dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
+                        dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
+                        cmsd+=dx*dx+dy*dy+dz*dz;
+                    }
+                    dmsd[j]+=cmsd;
+                    nmsd[j]++;
+                    }
+        }
+        
         std::cerr<<"# PRINTING OUT msd\n";
         for (unsigned long it=0; it<msdlag; ++it)
         {
             (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]/msdnat<<std::endl;
         }
+        
     }
     if (fdipole)
     {
