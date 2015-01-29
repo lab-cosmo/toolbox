@@ -36,7 +36,7 @@ public:
         // computes intermediate values that are handy to compute the PDF
         // inverse covariance matrix
         MatrixInverse(C,iC);  // it would be much better to use cholesky instead. TODO
-        FMatrix<double> Q; std::valarray<double> q;
+        FMatrix<double> Q; std::valarray<double> q; 
         EigenSolverSym(C,Q,q);  // computes the determinant the silly way
         ldet=0.; for (int i=0; i<sz; ++i) ldet+=log(q[i]>0.?q[i]:1e-100);
         lpi=-log(2.*constant::pi)*double(sz)*0.5;  // the other constant in the normalization

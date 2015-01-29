@@ -485,7 +485,7 @@ int main(int argc, char **argv)
     hgdr.get_options(hgwo); hgwo.window=hwin; hgwo.walls=HGBHard;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hgdr.set_options(hgwo);
 
-    double d12, dx, dy, dz, cog2=cogdr*cogdr, ngdrpairs=0;
+    double d12, dx, dy, dz, cog2=cogdr*cogdr, gdrw, gdrwtot;
     int nfr=0, npfr=0;
     
     //velocity-velocity correlation stuff
@@ -1161,22 +1161,27 @@ int main(int argc, char **argv)
             if (lgdr2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
                 if (af.ats[i].name==lgdr2) al2.push_back(af.ats[i]);
-
+            
+            gdrw=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
                 for (unsigned long j=0; j<al2.size(); ++j)
             {
+                if (i==j) continue;
+                gdrw+=1.0;
+                
                 dx=al1[i].x-al2[j].x;
                 dy=al1[i].y-al2[j].y;
                 dz=al1[i].z-al2[j].z;
                 micmat(ICM,dx,dy,dz);
                 micpbc(1.,1.,1.,dx,dy,dz);
                 micmat(CM,dx,dy,dz);
+                
                 if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
                 d12=dx*dx+dy*dy+dz*dz;
                 if (d12>cog2||d12==0.) continue;
                 hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
             }
-            ngdrpairs+=al1.size()*al2.size()*statweight;   // potential number of pairs in the cell volume
+            if (gdrw>0.0) gdrwtot+=statweight*gdrw;   // total weight to be considered when renormalizing g(r)
         }
         if (fvvac)
         {
@@ -1291,9 +1296,11 @@ int main(int argc, char **argv)
         hgdr.get_bins(r, w, gr);
         for (unsigned long i=0; i<r.size(); ++i)
         { gr[i]=gr[i]/(4*constant::pi*r[i]*r[i]); }
+        
+        //bins = bins/ndata -> Int bins = 1
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
-        else gr*=hgdr.samples()/(ngdrpairs/cvolume);
+        else gr*=hgdr.samples()/(gdrwtot/cvolume);
         for (unsigned long i=0; i<r.size(); ++i)
             (*ogdr)<<r[i]<<" "<<gr[i]<<std::endl;
     }
