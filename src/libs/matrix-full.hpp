@@ -158,6 +158,11 @@ public:
         return data[i*wc+j]; 
     }
     
+    inline std::slice_array<U> all()
+    {
+        return data[std::slice(0,data.size(),1)];
+    }
+    
     inline std::slice_array<U> row(const index_type& i)
     {
         return data[std::slice(i*wc,wc,1)];

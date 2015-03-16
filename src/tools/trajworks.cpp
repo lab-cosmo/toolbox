@@ -492,9 +492,9 @@ int main(int argc, char **argv)
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
 
     //MSD stuff
-    unsigned long imsd=0, msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
+    unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
     std::valarray<AtomFrame> msdbuff(msdlag);
-    std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; std::valarray<bool> fmsd_inc;
+    std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; FMatrix<bool>  fmsd_inc(msdlag,msdlag);
 
     //density histograms
     std::valarray<HGOptions<Histogram<double> > > hgo(3);
@@ -1220,16 +1220,19 @@ int main(int argc, char **argv)
             
             if (npfr==1){ // mark the species to be used
                           // to compute the MSD
-                if (imsd==0){
-                    fmsd_inc.resize(af.ats.size()); fmsd_inc=false;
-                    if (lmsd=="*") { fmsd_inc=true; msdnat=af.ats.size(); }
-                    else for(unsigned long i=0; i<af.ats.size(); ++i)
-                        if(af.ats[i].name==lmsd){ 
-                            fmsd_inc[i]=true; msdnat++; 
-                        }
-                }
+                fmsd_inc.resize(msdlag,af.ats.size()); fmsd_inc.all()=false;
             }
             
+            fmsd_inc.row((npfr-1)%msdlag)=false;
+            if (lmsd=="*") { fmsd_inc.row((npfr-1)%msdlag)=true; }
+            else for(unsigned long i=0; i<af.ats.size(); ++i)
+                if(af.ats[i].name==lmsd) { 
+                    fmsd_inc((npfr-1)%msdlag,i)=true;
+                }
+                
+            /*std::valarray<bool> tempor(af.ats.size()); 
+            tempor=fmsd_inc.row((npfr-1)%msdlag);
+            std::cerr<<tempor<<"\n";*/
             // fill the buffer
             msdbuff[(npfr-1)%msdlag] = af;
             if((npfr-1)<(msdlag-1)) continue;
@@ -1238,14 +1241,15 @@ int main(int argc, char **argv)
             imsd = (npfr-1)-(msdlag-1);
             for (unsigned long j=0; j<msdlag; ++j) {
                 double cmsd=0.;
-                for (unsigned long o=0; o<af.ats.size(); ++o) if (fmsd_inc[o]) {
-                    dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
-                    dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
-                    dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
-                    cmsd+=dx*dx+dy*dy+dz*dz;
-                }
-                dmsd[j]+=cmsd;
-                nmsd[j]++;
+                for (unsigned long o=0; o<af.ats.size(); ++o)
+                    if(fmsd_inc(imsd%msdlag,o)) {
+                       dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
+                       dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
+                       dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
+                       //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
+                       dmsd[j]+=dx*dx+dy*dy+dz*dz;
+                       nmsd[j]++;
+                    }                
                 }
             
         }
@@ -1397,22 +1401,23 @@ int main(int argc, char **argv)
             std::cerr<<  "Finishing to average the MSD "<<std::setw(10)<<std::setiosflags(std::ios::right)<<imsd<<"\r";
             for (unsigned long j=0; j<msdlag; ++j) {
                     if ((imsd+j)>(npfr-1)) break;
-                    double cmsd=0.;
-                    for (unsigned long o=0; o<af.ats.size(); ++o) {
-                        dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
-                        dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
-                        dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
-                        cmsd+=dx*dx+dy*dy+dz*dz;
-                    }
-                    dmsd[j]+=cmsd;
-                    nmsd[j]++;
-                    }
+                    for (unsigned long o=0; o<af.ats.size(); ++o)
+                        if(fmsd_inc(imsd%msdlag,o)) {
+                           dx=msdbuff[(imsd+j)%msdlag].ats[o].x-msdbuff[imsd%msdlag].ats[o].x;
+                           dy=msdbuff[(imsd+j)%msdlag].ats[o].y-msdbuff[imsd%msdlag].ats[o].y;
+                           dz=msdbuff[(imsd+j)%msdlag].ats[o].z-msdbuff[imsd%msdlag].ats[o].z;
+                           //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
+                           dmsd[j]+=dx*dx+dy*dy+dz*dz;
+                           nmsd[j]++;
+                        }                
+                    
+                }
         }
         
         std::cerr<<"# PRINTING OUT msd\n";
         for (unsigned long it=0; it<msdlag; ++it)
         {
-            (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]/msdnat<<std::endl;
+            (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]<<std::endl;
         }
         
     }
