@@ -250,6 +250,160 @@ void min_simplex (
 }
 
 
+
+/***********************************************************************
+ NESTED SAMPLING MINIMIZER
+ set number of walkers K, and generate K uniformly random samples {x_i, 1 <=i <=K}, evaluate objective function for all of them:  y_i = f(x_i)
+
+loop 
+  sort vector y_i, pick i with highest y_i
+  set limit<- y_i
+  discard sample x_i, replace it with a clone of randomly selected j: x_i <- x_j
+  perform random walk on x_i, only subject to constraint f(x_i) < limit, adjust step size to maintain acceptance ratio
+end
+
+************************************************************************/
+typedef struct _NestSampOpts {
+    double mc_step, mc_wall;
+    unsigned long steps, killsteps, psize;
+    double adapt, adapt_target;
+    _NestSampOpts(): mc_step(1.0), psize(0), mc_wall(0), steps(2), killsteps(100), adapt(1.25), adapt_target(0.3) {}
+} NestSampOptions;
+
+std::valarray<std::valarray<double> > make_walkers(unsigned long ndim, unsigned long nwalker, double dr, MTRndUniform rngu=MTRndUniform());
+
+template<class FCLASS>
+void min_nestsamp (
+                  FCLASS& f,
+                  const std::valarray<std::valarray<double> > & initial_walkers,
+                  std::valarray<double>& rpos, double& rvalue,
+                  IterOptions<double,2> iops=IterOptions<double,2>(
+                          __TB_STD_MAXSTEP,
+                          fixarray<double,2>(__TB_STD_EPS, __TB_STD_EPS),
+                         fixarray<double,2>(0.,0.),
+                        fixarray<double,2>(ichk_change, ichk_default)),
+                  const NestSampOptions nso=NestSampOptions(),
+                  MTRndUniform rngu=MTRndUniform()
+                 )
+{
+#ifdef DEBUG
+    if (initial_walkers.size()<2 )
+        ERROR("Need at least two walkers to perform nested sampling.")
+#endif
+    unsigned long nwalk=initial_walkers.size(), wdim=initial_walkers[0].size(), imax, ispawn;
+    std::valarray<std::valarray<double> > w_pos(initial_walkers);
+    std::valarray<double> w_val(nwalk), npos(wdim);
+    std::valarray<unsigned long> w_nok(nwalk);
+    double maxw, nval, mcstep;
+    
+    
+    std::cerr<<"Initialize walker values: \n";
+    maxw=-1e-100;
+    for (unsigned long i=0; i<nwalk; i++)
+    {
+        f.set_vars(w_pos[i]);
+        f.get_value(w_val[i]);        
+        if (maxw<w_val[i]) maxw=w_val[i];
+    }
+    w_nok=0; rpos=w_pos[0]; rvalue=w_val[0];
+    std::cerr<<"\n";
+    rpos.resize(w_pos[0].size());
+    rpos=w_pos[0]; rvalue=w_val[0]; 
+    w_nok=0; mcstep=nso.mc_step;
+    unsigned long nstep=0;
+    while (!iops)
+    {
+        // does some random walking
+        double accept=0;
+        for (unsigned long k=0; k<nso.steps; ++k)
+        {           
+            for (unsigned long i=0; i<nwalk; ++i)
+            {               
+               for (unsigned long j=0; j<wdim; ++j) npos[j] = rngu()-0.5;
+               npos *=  mcstep;
+               npos+=w_pos[i];
+                              
+               if (nso.mc_wall>0) 
+               { for (unsigned long j=0; j<wdim; ++j) if (fabs(npos[j])*2>nso.mc_wall) {npos[j]=w_pos[i][j]; accept--;} }
+               
+               
+               f.set_vars(npos); f.get_value(nval);
+               if (nval<=maxw) { w_pos[i]=npos; w_val[i]=nval; accept+=wdim;} // also keeps track of the accepted moves
+               if (nval<rvalue) { 
+                  rvalue=nval; rpos=w_pos[i]; 
+                  std::cerr<<"New low energy structure "<<rvalue<<"\n";
+                  std::cout<<"# New round\n";
+                  for (unsigned long j=0; j<wdim; j+=2) std::cout<<j<<" "<<rpos[j]<<" "<<rpos[j+1]<<"\n";
+               } // stores the lowest-energy walker
+            }            
+        }
+        
+        // do some point exchanges
+        int nxc; nxc=0;
+        if (nso.psize>0) for (unsigned long i=0; i<nwalk; ++i)
+            {  
+               
+               unsigned long ip1, ip2;
+               for (unsigned int k=0; k<4; ++k) {
+               ip1 = (int) (rngu()*nwalk/nso.psize);
+               ip2 = (int) (rngu()*nwalk/nso.psize);
+               if (ip1!=ip2) 
+               {
+                  npos = w_pos[i]; 
+                  
+                  for (unsigned long j=0; j<nso.psize; ++j)
+                  { npos[ip1*nso.psize+j]=w_pos[i][ip2*nso.psize+j]; npos[ip2*nso.psize+j]=w_pos[i][ip1*nso.psize+j]; }
+                  
+                  f.set_vars(npos); f.get_value(nval);
+                  if (nval<=maxw) { w_pos[i]=npos; w_val[i]=nval; nxc++;} // also keeps track of the accepted moves               
+               }
+               }
+            }
+         std::cerr<<"Accepted "<<nxc/4<<" swaps!\n";
+        nstep++;
+        
+        double wspread=0;
+        npos = 0.0; for (unsigned long i=0; i<nwalk; i++) npos+=w_pos[i]; npos*=1.0/nwalk;        
+        for (unsigned long i=0; i<nwalk; i++)
+          wspread+=((w_pos[i]-npos)*(w_pos[i]-npos)).sum();
+        wspread = std::sqrt(wspread/(nwalk -1));
+        
+        // selects the hottest replica
+        maxw=w_val[0]; imax=0;        
+        for (unsigned long i=1; i<nwalk; i++)
+        { if (w_val[i]>maxw) { maxw=w_val[i]; imax=i; } }
+        
+        // kills the hot replica and spawns it on a random walker
+        if (nstep%nso.killsteps==0) 
+        {           
+           ispawn = imax;
+           while (ispawn==imax) ispawn=rngu()*nwalk;
+           w_pos[imax] = w_pos[ispawn];
+           w_val[imax] = w_val[ispawn];
+           std::cerr<<"Killing hot replica "<<imax<<" & respawning on "<<ispawn<<"\n";
+        }
+         
+        // adaptive mc step
+        accept/=(nwalk*nso.steps*wdim);        
+        if (accept>nso.adapt_target) mcstep*=nso.adapt;
+        else mcstep/=nso.adapt*1.001;
+        std::cerr<<"Nested Sampling spread "<< wspread <<" setting threshold "<<maxw<<" minimum energy structure "<<rvalue<<"\n";
+        std::cerr<<"Mean acceptance "<<accept<<", new step "<<mcstep<<"\n";
+        
+        // sets the checks for bailing out of the loop
+        iops.setval(fabs(maxw-rvalue),0); 
+        iops.setval(mcstep,1);
+        
+        
+     }
+#ifdef DEBUG
+    if (iops.maxstep_reached() ) ERROR("Minimization finished before reaching required accuracy")
+#endif
+}
+
+
+
+
 /***********************************************************************
              LINE SEARCH (no gradients)
  ***********************************************************************/

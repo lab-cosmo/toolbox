@@ -1382,7 +1382,7 @@ int main(int argc, char **argv)
                         +vvacf[3*i+1][it]*vvacf[3*i+1].sigma()*vvacf[3*i+1].sigma()
                         +vvacf[3*i+2][it]*vvacf[3*i+2].sigma()*vvacf[3*i+2].sigma();
         }
-        vbt=vvt;
+        vbt=vvt/vvnat;
         if (fvvacbox) for (unsigned long it=0; it<vvlag; ++it) vbt[it]=vvt[it]*(1.-double(it)/double(vvlag));
         std::cerr<<"# PRINTING OUT v-v autocorrelation"<<(fvvacbox?" (triangle windowed) ":"")<<"\n";
         //we are goood guys, so we also compute the FT of the vvac straight away
