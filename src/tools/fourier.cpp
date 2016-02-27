@@ -62,6 +62,8 @@ int main(int argc, char ** argv)
       for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/5.0),2));         
    else if (wnd=="gauss-6")
       for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=exp(-pow(double(i)/(2.0*double(ndata)/6.0),2));         
+   else if (wnd=="blackman-harris")
+      for (unsigned long i=0 ; i<ndata; ++i) vvt[i]*=(35875 + 48829*cos((i*constant::pi)/(-1. + ndata)) + 14128*cos((2*i*constant::pi)/(-1. + ndata)) + 1168*cos((3*i*constant::pi)/(-1. + ndata)))/   100000.;   
    else if (wnd!="") ERROR("Window function "<< wnd << " mispelled or not implemented.");
    // FFTW calls
    fftw_plan r2rplan=fftw_plan_r2r_1d(nfft, &vvt[0], &vvw[0], FFTW_REDFT00, FFTW_ESTIMATE);
