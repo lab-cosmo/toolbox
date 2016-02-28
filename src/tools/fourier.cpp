@@ -18,7 +18,8 @@ void banner()
             << " -dt [dt]    sets the time interval between input samples. {def: 1.0}           \n"
             << " -pad [npad] appends npad zeroes before doing the FT. increases the resolution. \n"
             << " -win [wnd]  applies a windowing function to the data before FT.                \n"
-            << "             possible values: triangle | cosine | hanning | gauss-[2,3,4,5,6]   \n"
+            << "             possible values: triangle | cosine | hanning | gauss-[2,3,4,5,6] | \n"
+            << "             blackman-harris                                                    \n"
             << "                                                                                \n";
 }
 
