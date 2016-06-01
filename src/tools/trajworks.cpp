@@ -7,6 +7,7 @@
 #include "tools-autocorr.hpp"
 #include "fftw3.h"
 #include<fstream>
+#include <math.h>
 //ooops! beware, this requires extensions to STL. should program with conditional compilation
 //#define __USEREGEX 1
 #ifdef __USEREGEX
@@ -311,6 +312,7 @@ void banner()
             << " -fstop    frame to stop at                                                     \n"
             << " -fstep    use just a frame every fstep frames in input                         \n"
             << " -ixyz     input is an xyz trajectory. velocities might be read as 4,5,6 field  \n"
+            << " -ipdb     input is a PDB format, a portable format for trajectories            \n"
             << " -idlp     input is a DLPOLY HISTORY file                                       \n"
             << " -ref      reads reference for alignment, etc. from the given file              \n"
             << " -box file reads cell parameters from file ( axx axy axz\n ayx ayy ... )        \n"
@@ -376,7 +378,7 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fvvac=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    bool fgdr=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
@@ -390,6 +392,7 @@ int main(int argc, char **argv)
             clp.getoption(funwrap,"unwrap",false) &&
             clp.getoption(fstep,"fstep",(unsigned long) 0) &&
             clp.getoption(fxyz,"ixyz",true) &&
+            clp.getoption(fpdb,"ipdb",false) &&
             clp.getoption(fdlp,"idlp",false) &&
             clp.getoption(fref,"ref",std::string("")) &&
             clp.getoption(fbox,"box",std::string("")) &&
@@ -699,7 +702,7 @@ int main(int argc, char **argv)
     if (fbox!="") ifbox.open(fbox.c_str());
     if (fweights!="") ifweights.open(fweights.c_str());
     ffirstcell=true;    
-    while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
+    while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af))||(fpdb && ReadPDBFrame(std::cin,af)))
     {
         ++nfr;
         if (fstop!=0 && nfr>fstop)  break;
@@ -748,6 +751,7 @@ int main(int argc, char **argv)
                 std::ifstream ifref(fref.c_str()); bool succ;
                 if (fdlp) succ=ReadDLPConf(ifref,reffr);
                 else if (fxyz) succ=ReadXYZFrame(ifref,reffr);
+                else if (fpdb) succ=ReadPDBFrame(ifref,reffr);
                 else ERROR("I don't know how to read this...");
 
                 if (!succ) ERROR("Format error in ref file.");

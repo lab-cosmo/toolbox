@@ -42,6 +42,36 @@ void ReadXYZ(std::istream& istr, std::vector<AtomFrame>& frames)
     unsigned long nfr=0;
     while(ReadXYZFrame(istr,curfr)) {curfr.index=(++nfr); frames.push_back(curfr);}
 }
+
+bool ReadPDBFrame(std::istream& istr, AtomFrame& curfr)
+{
+    std::string line, check, none1, none2, start;
+    std::stringstream ss;
+    AtomData curat;
+    unsigned long nat, ifr, ipbc, ikey, i; double cprop;
+    curfr.index=0; curfr.ats.resize(0);
+    for (i=0; getline(istr, line); ++i)
+    {   
+        ss.clear(); ss.str(line);
+        curat.props.resize(0);
+        ss>>check;         
+        if ((check != "ATOM") || (check !=  "HETATM")) continue;
+        if ((check == "END") || (check == "ENDMDL")) continue;
+        ss>>ikey>>curat.name>>curat.molname>>curat.nprops["mol"]>>curat.x>>curat.y>>curat.z>>none1>>none2>>curat.group>>curat.atlabel;
+        if (ss.bad()) ERROR("Read failed in frame "<<curfr.index<<", on atom "<<i<<".");
+        while ((ss>>cprop)) curat.props.push_back(cprop);
+        curfr.ats.push_back(curat);
+    }
+    return true;
+}
+
+void ReadPDB(std::istream& istr, std::vector<AtomFrame>& frames)
+{
+    frames.resize(0);
+    AtomFrame curfr;
+    unsigned long nfr=0;
+    while(ReadPDBFrame(istr,curfr)) {curfr.index=(++nfr); frames.push_back(curfr);}
+}
     
 bool ReadDLPFrame(std::istream& istr, AtomFrame& curfr)
 {
