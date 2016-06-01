@@ -702,7 +702,7 @@ int main(int argc, char **argv)
     if (fbox!="") ifbox.open(fbox.c_str());
     if (fweights!="") ifweights.open(fweights.c_str());
     ffirstcell=true;    
-    while ((fdlp && ReadDLPFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af))||(fpdb && ReadPDBFrame(std::cin,af)))
+    while ((fdlp && ReadDLPFrame(std::cin,af))||(fpdb && ReadPDBFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
     {
         ++nfr;
         if (fstop!=0 && nfr>fstop)  break;
@@ -731,11 +731,12 @@ int main(int argc, char **argv)
             for( int i=0 ; i<af.ats.size(); ++i ) af.ats[i].name=vlab[i];
         }
         npfr++; 
-        if (!fhavecell) //sets up unit cell for PBC
-        {
+        if (!fhavecell) //sets up unit cell for PBC  
+        {            
             fhavecell=true;
             if (fbox!="") {  CM = CBOX;  }
-            else if (fdlp) { af2cm(af,CM); }        
+            else if (fdlp) { af2cm(af,CM); }
+            else if (fpdb) { af2cm(af,CM); }
             else fhavecell=false;
             if (fhavecell)
             {
@@ -762,6 +763,7 @@ int main(int argc, char **argv)
         {
             if (fbox!="") { CM = CBOX; }
             else if (fdlp) { af2cm(af,CM); }
+            else if (fpdb) { af2cm(af,CM); }
             MatrixInverse(CM,ICM);
             //updates the average volume
             cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
