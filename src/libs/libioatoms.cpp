@@ -50,7 +50,7 @@ bool ReadPDBFrame(std::istream& istr, AtomFrame& curfr)
     AtomData curat;
     unsigned long nat, ifr, ipbc, ikey, i; double cprop;
     curfr.index=0; curfr.ats.resize(0); bool gotline;
-    for (i=0; gotline=getline(istr, line); ++i)
+    for (i=0; gotline=bool(getline(istr, line)); ++i)
     {   
         ss.clear(); ss.str(line);
         curat.props.resize(0);
