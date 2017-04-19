@@ -297,7 +297,45 @@ double get_cv(std::vector<AtomData>& al, unsigned long iat, std::vector<double>&
     return tcv;
 } //End of subroutine
 
+double fermict(double RR, double ctdist)
+{
+  double fbb;
+  fbb=1/(1+exp(5.*(-ctdist+RR)));
+  return fbb;
+} //End of subroutine
+
+double tanhct(double RR, double ctdist)
+{
+  double fbb;
+  if(RR<=ctdist) fbb=pow(tanh(1-RR/ctdist),3);
+  else fbb=0.0;
+  return fbb;
+} //End of subroutine
+
 #define BOHR2ANG 0.529177
+#define PIGRECOHALF  1.570796326794896619231321691639751442098584699687553
+
+double ctg6(double RR, double eta, double mu)
+{
+  double fbb;
+  if(RR<(mu+PIGRECOHALF/eta) && RR>(mu-PIGRECOHALF/eta)) fbb=pow(cos(eta*(RR-mu)),2);
+  else fbb=0.0;
+  return fbb;
+} //End of subroutine
+
+double ctg8(double RR, double ni, double al, double ar)
+{
+  double fbb;
+  if(RR<al && RR>(al-PIGRECOHALF/ni)) fbb=pow(cos(ni*(RR-al)),2);
+  else{
+    if(RR<ar && RR>al) fbb=1.0;
+    else{
+      if(RR<(ar+PIGRECOHALF/ni) && RR>ar) fbb=pow(cos(ni*(RR-ar)),2);
+      else 0.0;
+    }
+  }
+  return fbb;
+} //End of subroutine
 
 void banner()
 {
@@ -305,6 +343,28 @@ void banner()
             << " USAGE: trajworks  [options] < INPUT [ > OUTPUT ]                               \n"
             << " reads atomic trajectories and computes a number of average structural and      \n"
             << " dynamical properties.                                                          \n"
+            << " ## SYMMETRY FUNCTIONS:                                                         \n"
+            << " -fsymG1                \n"
+            << " -fsymG2                \n"
+            << " -fsymG3                \n"
+            << " -fsymG4                \n"
+            << " -fsymG5                \n"
+            << " -fsymG6                \n"
+            << " -fsymG7                \n"
+            << " -fsymG8                \n"
+            << " -fct1     Fermi cutoff function                           \n"
+            << " -fct2     tanh cutoff function                            \n"
+            << " -rsg2     Rs param for the symfunc G2                     \n"
+            << " -kg3      k param for the symfunc G3                      \n"
+            << " -mug6     mu for the symfunc G6                           \n"
+            << " -nig8     ni for the symfunc G8                           \n"
+            << " -alg8     al for the symfunc G8                           \n"
+            << " -arg8     ar for the symfunc G8                           \n"
+            << " -salpha   alpha param for the symfunc G7 and G8           \n"
+            << " -sct      cutoff radius for the symfunc                   \n"
+            << " -eta      eta fact                                 \n"
+            << " -zeta     zeta fact                                \n"
+            << " -slambda   1 or -1                                 \n"
             << " ## GENERAL OPTIONS:                                                            \n"
             << " -ts       timestep (time span between two frames in input file)                \n"
             << " -o        prefix for output file names (otherwise everything goes to stdout)   \n"
@@ -378,14 +438,36 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    bool fsymG1=false,fsymG2=false,fsymG3=false,fsymG4=false,fsymG5=false,fsymG6=false,fsymG7=false,fsymG8=false,fct1=false,fct2=false,
+    fgdr=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
-    double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
+    double drangeax, drangebx, drangeay, drangeby,  drangeaz, drangebz,sct,eta,zeta,slambda,rsg2,kg3,mug6,salpha,nig8,alg8,arg8;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
     bool fok=
             //general options
             clp.getoption(prefix,"o",std::string("")) &&
+            clp.getoption(fsymG1,"fsymG1",false) &&
+            clp.getoption(fsymG2,"fsymG2",false) &&
+            clp.getoption(fsymG3,"fsymG3",false) &&
+            clp.getoption(fsymG4,"fsymG4",false) &&
+            clp.getoption(fsymG5,"fsymG5",false) &&
+            clp.getoption(fsymG6,"fsymG6",false) &&
+            clp.getoption(fsymG7,"fsymG7",false) &&
+            clp.getoption(fsymG8,"fsymG8",false) &&
+            clp.getoption(fct1,"fct1",true) &&
+            clp.getoption(fct2,"fct2",false) &&
+            clp.getoption(eta,"eta",0.001) &&
+            clp.getoption(kg3,"kg3",15.) &&
+            clp.getoption(mug6,"mug6",18.) &&
+            clp.getoption(zeta,"zeta",4.) &&
+            clp.getoption(rsg2,"rsg2",18.) &&
+            clp.getoption(nig8,"nig8",18.) &&
+            clp.getoption(alg8,"alg8",18.) &&
+            clp.getoption(arg8,"arg8",18.) &&
+            clp.getoption(sct,"sct",20.) &&
+            clp.getoption(slambda,"slambda",1.) &&
+            clp.getoption(salpha,"salpha",1.) &&
             clp.getoption(dt,"ts",1.) &&
             clp.getoption(fstart,"fstart",(unsigned long) 0) &&
             clp.getoption(fstop,"fstop",(unsigned long) 0) &&
@@ -403,7 +485,7 @@ int main(int argc, char **argv)
             clp.getoption(hwinfac,"hwinfac",1.) &&
             clp.getoption(fweights,"weights",std::string("")) &&
             //g(r) options
-            clp.getoption(fgdr,"gr",false) &&            
+            clp.getoption(fgdr,"gr",false) &&
             clp.getoption(lgdr1,"gr1",std::string("*")) &&
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
@@ -490,12 +572,12 @@ int main(int argc, char **argv)
 
     double d12, dx, dy, dz, cog2=cogdr*cogdr, gdrw, gdrwtot;
     int nfr=0, npfr=0;
-    
+
     //velocity-velocity correlation stuff
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
 
     //MSD stuff
-    unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
+    unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag);
     std::valarray<AtomFrame> msdbuff(msdlag);
     std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; FMatrix<bool>  fmsd_inc(msdlag,msdlag);
 
@@ -663,19 +745,19 @@ int main(int argc, char **argv)
     rng.RUGenerator().seed(100);
 
     //cell matrix reading
-    std::ifstream ifbox; 
+    std::ifstream ifbox;
     FMatrix<double> CBOX(3,3), CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
-   
+
     //charge dictionary
     std::ifstream ifqat;
     std::map<std::string, double> qmap;
-    if (fqat!="") 
+    if (fqat!="")
     {
        std::string qlabel; double qq;
        ifqat.open(fqat.c_str());
        while (ifqat.good())
        {
-          ifqat>>qlabel>>qq; 
+          ifqat>>qlabel>>qq;
           qmap[qlabel]=qq;
        }
     }
@@ -701,17 +783,123 @@ int main(int argc, char **argv)
     double statweight=1.0, stattot=0.0;
     if (fbox!="") ifbox.open(fbox.c_str());
     if (fweights!="") ifweights.open(fweights.c_str());
-    ffirstcell=true;    
+    ffirstcell=true;
     while ((fdlp && ReadDLPFrame(std::cin,af))||(fpdb && ReadPDBFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
     {
         ++nfr;
+
+ if(fsymG1 || fsymG2 || fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
+    //general stuff
+    double dxv1,dxv2,dyv1,dyv2,dzv1,dzv2,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
+
+    std::valarray<double> g1i(af.ats.size());
+    std::valarray<double> g2i(af.ats.size());
+    std::valarray<double> g3i(af.ats.size());
+    std::valarray<double> g4i(af.ats.size());
+    std::valarray<double> g5i(af.ats.size());
+    std::valarray<double> g6i(af.ats.size());
+    std::valarray<double> g7i(af.ats.size());
+    std::valarray<double> g8i(af.ats.size());
+
+    for (int i=0; i<af.ats.size(); ++i){
+       if(fsymG1) g1i[i]=0.0;
+       if(fsymG2) g2i[i]=0.0;
+       if(fsymG3) g3i[i]=0.0;
+       if(fsymG4) g4i[i]=0.0;
+       if(fsymG5) g5i[i]=0.0;
+       if(fsymG6) g6i[i]=0.0;
+       if(fsymG7) g7i[i]=0.0;
+       if(fsymG8) g8i[i]=0.0;
+       for (int j=0; j<af.ats.size(); ++j){
+         if(j!=i){
+           //get the thistance to the fisrt atom
+           dxv1=af.ats[j].x-af.ats[i].x;
+           dyv1=af.ats[j].y-af.ats[i].y;
+           dzv1=af.ats[j].z-af.ats[i].z;
+           dv1=sqrt(dxv1*dxv1+dyv1*dyv1+dzv1*dzv1);
+           // get the cutoff func
+           if(fct1){
+             fb1=fermict(dv1,sct);
+           }
+           if(fct2){
+             // this is the one used by Beheler
+             fb1=tanhct(dv1,sct);
+           }
+
+           if(fsymG1) g1i[i]+=fb1;
+           if(fsymG2) g2i[i]+=exp(-eta*pow(dv1-rsg2,2))*fb1;
+           if(fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
+             for (int k=0; k<af.ats.size(); ++k){
+               if(j!=i && k!=j && k!=i){
+                 //get the thistance to the second atom
+                 dxv2=af.ats[k].x-af.ats[i].x;
+                 dyv2=af.ats[k].y-af.ats[i].y;
+                 dzv2=af.ats[k].z-af.ats[i].z;
+                 dv2=sqrt(dxv2*dxv2+dyv2*dyv2+dzv2*dzv2);
+                 dv3=sqrt((af.ats[j].x-af.ats[k].x)*(af.ats[j].x-af.ats[k].x)+(af.ats[j].y-af.ats[k].y)*(af.ats[j].y-af.ats[k].y)+(af.ats[j].z-af.ats[k].z)*(af.ats[j].z-af.ats[k].z));
+                 // get the (cos)angle
+                 cosang=(dxv1*dxv2+dyv1*dyv2+dzv1*dzv2)/(dv1*dv2);
+                 if(fsymG3) g3i[i]+=cos(kg3*acos(cosang))*fb1;
+                 if(fct1){
+                   fb2=fermict(dv2,sct);
+                   fb3=fermict(dv3,sct);
+                 }
+                 if(fct2){
+                   // this is the one used by Beheler
+                   fb2=tanhct(dv2,sct);
+                   fb3=tanhct(dv3,sct);
+                 }
+                 if(fsymG4 || fsymG5 || fsymG6){
+                   expg=pow(1+slambda*cosang,zeta);
+                   if(fsymG4) g4i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2+dv3*dv3))*fb1*fb2*fb3;
+                   if(fsymG5) g5i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2))*fb1*fb2;
+                   if(fsymG6) g6i[i]+=expg*ctg6(dv1,eta,mug6)*ctg6(dv2,eta,mug6);
+                 }
+                 if(fsymG7 || fsymG8){
+                   expg=sin(eta*(acos(cosang)-salpha));
+                   if(fsymG7) g7i[i]+=expg*fb1*fb2;
+                   if(fsymG8) g8i[i]+=expg*ctg8(dv1,nig8,alg8,arg8)*ctg8(dv2,nig8,alg8,arg8);
+                 }
+                 //std::cout<<" FERmi "<<fb1<<" "<<fb2<<" "<<fb3<<"\n";
+                 //dmsd[j]+=dx*dx+dy*dy+dz*dz;
+               }
+             }
+           }
+          }
+       }
+       if(fsymG4 || fsymG5 || fsymG6){
+         g4i[i]*=pow(2,1-zeta);
+         g5i[i]*=pow(2,1-zeta);
+         g6i[i]*=pow(2,1-zeta);
+       }
+       if(fsymG7 || fsymG8){
+         g5i[i]*=0.5;
+         g6i[i]*=0.5;
+       }
+       //std::cout<<i<<" "<<g3i<<"\n";
+    }
+    std::stringstream bufferrr;
+    for (int i=0; i<af.ats.size(); ++i){
+      if(fsymG1) bufferrr<<g1i[i]<<" ";
+      if(fsymG2) bufferrr<<g2i[i]<<" ";
+      if(fsymG3) bufferrr<<g3i[i]<<" ";
+      if(fsymG4) bufferrr<<g4i[i]<<" ";
+      if(fsymG5) bufferrr<<g5i[i]<<" ";
+      if(fsymG6) bufferrr<<g6i[i]<<" ";
+      if(fsymG7) bufferrr<<g7i[i]<<" ";
+      if(fsymG8) bufferrr<<g8i[i]<<" ";
+      bufferrr<<"\n";
+      std::cout<<bufferrr.str();
+    } 
+ }
+
         if (fstop!=0 && nfr>fstop)  break;
         // reads anyway box and weights, as they are meant to span the whole trajectory
         if (fbox!="" and (fvbox || ffirstcell) )
         { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file."); }
         if (fweights!="")
         {
-            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
+            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs
             if (!ifweights.good()) ERROR("Format error in weights file.");
         }
         if (fqat!="")
@@ -720,7 +908,7 @@ int main(int argc, char **argv)
            {
               af.ats[i].nprops["charge"]=qmap[af.ats[i].name];
            }
-        }        
+        }
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
         { std::cerr<<"Skipping frame   "<<std::setw(10)<<std::setiosflags(std::ios::right)<<nfr<<"\r"; continue; }
 
@@ -730,9 +918,9 @@ int main(int argc, char **argv)
             if (af.ats.size()!=vlab.size()) ERROR("Atom number mismatch at frame"<<nfr);
             for( int i=0 ; i<af.ats.size(); ++i ) af.ats[i].name=vlab[i];
         }
-        npfr++; 
-        if (!fhavecell) //sets up unit cell for PBC  
-        {            
+        npfr++;
+        if (!fhavecell) //sets up unit cell for PBC
+        {
             fhavecell=true;
             if (fbox!="") {  CM = CBOX;  }
             else if (fdlp) { af2cm(af,CM); }
@@ -1167,21 +1355,21 @@ int main(int argc, char **argv)
             if (lgdr2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
                 if (af.ats[i].name==lgdr2) al2.push_back(af.ats[i]);
-            
+
             gdrw=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
                 for (unsigned long j=0; j<al2.size(); ++j)
             {
                 if (i==j) continue;
                 gdrw+=1.0;
-                
+
                 dx=al1[i].x-al2[j].x;
                 dy=al1[i].y-al2[j].y;
                 dz=al1[i].z-al2[j].z;
                 micmat(ICM,dx,dy,dz);
                 micpbc(1.,1.,1.,dx,dy,dz);
                 micmat(CM,dx,dy,dz);
-                
+
                 if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
                 d12=dx*dx+dy*dy+dz*dz;
                 if (d12>cog2||d12==0.) continue;
@@ -1223,26 +1411,26 @@ int main(int argc, char **argv)
         }
         if (fmsd)
         {
-            
+
             if (npfr==1){ // mark the species to be used
                           // to compute the MSD
                 fmsd_inc.resize(msdlag,af.ats.size()); fmsd_inc.all()=false;
             }
-            
+
             fmsd_inc.row((npfr-1)%msdlag)=false;
             if (lmsd=="*") { fmsd_inc.row((npfr-1)%msdlag)=true; }
             else for(unsigned long i=0; i<af.ats.size(); ++i)
-                if(af.ats[i].name==lmsd) { 
+                if(af.ats[i].name==lmsd) {
                     fmsd_inc((npfr-1)%msdlag,i)=true;
                 }
-                
-            /*std::valarray<bool> tempor(af.ats.size()); 
+
+            /*std::valarray<bool> tempor(af.ats.size());
             tempor=fmsd_inc.row((npfr-1)%msdlag);
             std::cerr<<tempor<<"\n";*/
             // fill the buffer
             msdbuff[(npfr-1)%msdlag] = af;
             if((npfr-1)<(msdlag-1)) continue;
-            
+
             // compute the avg MSD
             imsd = (npfr-1)-(msdlag-1);
             for (unsigned long j=0; j<msdlag; ++j) {
@@ -1255,9 +1443,9 @@ int main(int argc, char **argv)
                        //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
                        dmsd[j]+=dx*dx+dy*dy+dz*dz;
                        nmsd[j]++;
-                    }                
+                    }
                 }
-            
+
         }
         if (fdipole)
         {
@@ -1279,7 +1467,7 @@ int main(int argc, char **argv)
                 {
                    if (af.ats[i].name == "H") af.ats[i].nprops["charge"]=1.0;
                    if (af.ats[i].name == "O") af.ats[i].nprops["charge"]=-2.0;
-                } 
+                }
                 dip_cur.x+=dx*af.ats[i].nprops["charge"];
                 dip_cur.y+=dy*af.ats[i].nprops["charge"];
                 dip_cur.z+=dz*af.ats[i].nprops["charge"];
@@ -1300,13 +1488,13 @@ int main(int argc, char **argv)
 
     if (fgdr)
     {
-        
+
         std::cerr<<"# PRINTING OUT g(r) FOR "<<lgdr1<<" - "<<lgdr2<<" PAIR\n";
         std::valarray<double> r, w, gr;
         hgdr.get_bins(r, w, gr);
         for (unsigned long i=0; i<r.size(); ++i)
         { gr[i]=gr[i]/(4*constant::pi*r[i]*r[i]); }
-        
+
         //bins = bins/ndata -> Int bins = 1
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
@@ -1383,7 +1571,7 @@ int main(int argc, char **argv)
         vvt=0.; vvw=0.;
         for (unsigned long it=0; it<vvlag; ++it)
         {
-            for (unsigned long i=0; i<vvnat; ++i) if (vvacf[3*i].sigma()>0.0) 
+            for (unsigned long i=0; i<vvnat; ++i) if (vvacf[3*i].sigma()>0.0)
                 vvt[it]+=vvacf[3*i][it]*vvacf[3*i].sigma()*vvacf[3*i].sigma()
                         +vvacf[3*i+1][it]*vvacf[3*i+1].sigma()*vvacf[3*i+1].sigma()
                         +vvacf[3*i+2][it]*vvacf[3*i+2].sigma()*vvacf[3*i+2].sigma();
@@ -1416,17 +1604,17 @@ int main(int argc, char **argv)
                            //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
                            dmsd[j]+=dx*dx+dy*dy+dz*dz;
                            nmsd[j]++;
-                        }                
-                    
+                        }
+
                 }
         }
-        
+
         std::cerr<<"# PRINTING OUT msd\n";
         for (unsigned long it=0; it<msdlag; ++it)
         {
             (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]<<std::endl;
         }
-        
+
     }
     if (fdipole)
     {
