@@ -789,8 +789,14 @@ int main(int argc, char **argv)
         ++nfr;
 
  if(fsymG1 || fsymG2 || fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
+	 
+	 if (fstop!=0 && nfr>fstop)  break;
+        // reads anyway box and weights, as they are meant to span the whole trajectory
+        if (fbox!="" and (fvbox || ffirstcell) )
+        { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file.");}
+	
     //general stuff
-    double dxv1,dxv2,dyv1,dyv2,dzv1,dzv2,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
+    double dxv1,dxv2,dxv3,dyv1,dyv2,dyv3,dzv1,dzv2,dzv3,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
 
     std::valarray<double> g1i(af.ats.size());
     std::valarray<double> g2i(af.ats.size());
@@ -812,10 +818,11 @@ int main(int argc, char **argv)
        if(fsymG8) g8i[i]=0.0;
        for (int j=0; j<af.ats.size(); ++j){
          if(j!=i){
-           //get the thistance to the fisrt atom
+           //get the distance to the first atom
            dxv1=af.ats[j].x-af.ats[i].x;
            dyv1=af.ats[j].y-af.ats[i].y;
            dzv1=af.ats[j].z-af.ats[i].z;
+           micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv1,dyv1,dzv1);
            dv1=sqrt(dxv1*dxv1+dyv1*dyv1+dzv1*dzv1);
            // get the cutoff func
            if(fct1){
@@ -835,8 +842,13 @@ int main(int argc, char **argv)
                  dxv2=af.ats[k].x-af.ats[i].x;
                  dyv2=af.ats[k].y-af.ats[i].y;
                  dzv2=af.ats[k].z-af.ats[i].z;
+                 micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv2,dyv2,dzv2);
                  dv2=sqrt(dxv2*dxv2+dyv2*dyv2+dzv2*dzv2);
-                 dv3=sqrt((af.ats[j].x-af.ats[k].x)*(af.ats[j].x-af.ats[k].x)+(af.ats[j].y-af.ats[k].y)*(af.ats[j].y-af.ats[k].y)+(af.ats[j].z-af.ats[k].z)*(af.ats[j].z-af.ats[k].z));
+                 dxv3=af.ats[j].x-af.ats[k].x;
+                 dyv3=af.ats[j].y-af.ats[k].y;
+                 dzv3=af.ats[j].z-af.ats[k].z;
+                 micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv3,dyv3,dzv3);
+                 dv3=sqrt(dxv3*dxv3+dyv3*dyv3+dzv3*dzv3);
                  // get the (cos)angle
                  cosang=(dxv1*dxv2+dyv1*dyv2+dzv1*dzv2)/(dv1*dv2);
                  if(fsymG3) g3i[i]+=cos(kg3*acos(cosang))*fb1;
