@@ -789,12 +789,14 @@ int main(int argc, char **argv)
         ++nfr;
 
  if(fsymG1 || fsymG2 || fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
-	 
+
 	 if (fstop!=0 && nfr>fstop)  break;
         // reads anyway box and weights, as they are meant to span the whole trajectory
         if (fbox!="" and (fvbox || ffirstcell) )
         { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file.");}
-	
+        else{ for (int i=0;i<3; ++i) for (int j=0;j<3;++j) CBOX(j,i)=0.0;
+             CBOX(0,0)=100000000.0;CBOX(1,1)=100000000.0;CBOX(2,2)=100000000.0;}
+
     //general stuff
     double dxv1,dxv2,dxv3,dyv1,dyv2,dyv3,dzv1,dzv2,dzv3,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
 
