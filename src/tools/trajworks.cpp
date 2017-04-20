@@ -882,29 +882,24 @@ int main(int argc, char **argv)
           }
        }
        if(fsymG4 || fsymG5 || fsymG6){
-         g4i[i]*=pow(2,1-zeta);
-         g5i[i]*=pow(2,1-zeta);
-         g6i[i]*=pow(2,1-zeta);
+         g4i[i]/=pow(2,zeta);
+         g5i[i]/=pow(2,zeta);
+         g6i[i]/=pow(2,zeta);
        }
        if(fsymG7 || fsymG8){
          g5i[i]*=0.5;
          g6i[i]*=0.5;
        }
        //std::cout<<i<<" "<<g3i<<"\n";
-    }
-    std::stringstream bufferrr;
-    for (int i=0; i<af.ats.size(); ++i){
-      bufferrr<<"";
-      if(fsymG1) bufferrr<<g1i[i]<<" ";
-      if(fsymG2) bufferrr<<g2i[i]<<" ";
-      if(fsymG3) bufferrr<<g3i[i]<<" ";
-      if(fsymG4) bufferrr<<g4i[i]<<" ";
-      if(fsymG5) bufferrr<<g5i[i]<<" ";
-      if(fsymG6) bufferrr<<g6i[i]<<" ";
-      if(fsymG7) bufferrr<<g7i[i]<<" ";
-      if(fsymG8) bufferrr<<g8i[i]<<" ";
-      bufferrr<<"\n";
-      std::cout<<bufferrr.str();
+       if(fsymG1) std::cout<<g1i[i]<<" ";
+       if(fsymG2) std::cout<<g2i[i]<<" ";
+       if(fsymG3) std::cout<<g3i[i]<<" ";
+       if(fsymG4) std::cout<<g4i[i]<<" ";
+       if(fsymG5) std::cout<<g5i[i]<<" ";
+       if(fsymG6) std::cout<<g6i[i]<<" ";
+       if(fsymG7) std::cout<<g7i[i]<<" ";
+       if(fsymG8) std::cout<<g8i[i]<<" ";
+       std::cout<<"\n";
     }
  }
 
