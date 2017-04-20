@@ -880,6 +880,7 @@ int main(int argc, char **argv)
     }
     std::stringstream bufferrr;
     for (int i=0; i<af.ats.size(); ++i){
+      bufferrr<<"";
       if(fsymG1) bufferrr<<g1i[i]<<" ";
       if(fsymG2) bufferrr<<g2i[i]<<" ";
       if(fsymG3) bufferrr<<g3i[i]<<" ";
@@ -890,7 +891,7 @@ int main(int argc, char **argv)
       if(fsymG8) bufferrr<<g8i[i]<<" ";
       bufferrr<<"\n";
       std::cout<<bufferrr.str();
-    } 
+    }
  }
 
         if (fstop!=0 && nfr>fstop)  break;
