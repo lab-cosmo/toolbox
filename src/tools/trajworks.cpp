@@ -788,121 +788,6 @@ int main(int argc, char **argv)
     {
         ++nfr;
 
- if(fsymG1 || fsymG2 || fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
-
-	 if (fstop!=0 && nfr>fstop)  break;
-        // reads anyway box and weights, as they are meant to span the whole trajectory
-        if (fbox!="" and (fvbox || ffirstcell) )
-        { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file.");}
-        else{ for (int i=0;i<3; ++i) for (int j=0;j<3;++j) CBOX(j,i)=0.0;
-             CBOX(0,0)=100000000.0;CBOX(1,1)=100000000.0;CBOX(2,2)=100000000.0;}
-
-    //general stuff
-    double dxv1,dxv2,dxv3,dyv1,dyv2,dyv3,dzv1,dzv2,dzv3,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
-
-    std::valarray<double> g1i(af.ats.size());
-    std::valarray<double> g2i(af.ats.size());
-    std::valarray<double> g3i(af.ats.size());
-    std::valarray<double> g4i(af.ats.size());
-    std::valarray<double> g5i(af.ats.size());
-    std::valarray<double> g6i(af.ats.size());
-    std::valarray<double> g7i(af.ats.size());
-    std::valarray<double> g8i(af.ats.size());
-
-    for (int i=0; i<af.ats.size(); ++i){
-       if(fsymG1) g1i[i]=0.0;
-       if(fsymG2) g2i[i]=0.0;
-       if(fsymG3) g3i[i]=0.0;
-       if(fsymG4) g4i[i]=0.0;
-       if(fsymG5) g5i[i]=0.0;
-       if(fsymG6) g6i[i]=0.0;
-       if(fsymG7) g7i[i]=0.0;
-       if(fsymG8) g8i[i]=0.0;
-       for (int j=0; j<af.ats.size(); ++j){
-         if(j!=i){
-           //get the distance to the first atom
-           dxv1=af.ats[j].x-af.ats[i].x;
-           dyv1=af.ats[j].y-af.ats[i].y;
-           dzv1=af.ats[j].z-af.ats[i].z;
-           micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv1,dyv1,dzv1);
-           dv1=sqrt(dxv1*dxv1+dyv1*dyv1+dzv1*dzv1);
-           // get the cutoff func
-           if(fct1){
-             fb1=fermict(dv1,sct);
-           }
-           if(fct2){
-             // this is the one used by Beheler
-             fb1=tanhct(dv1,sct);
-           }
-
-           if(fsymG1) g1i[i]+=fb1;
-           if(fsymG2) g2i[i]+=exp(-eta*pow(dv1-rsg2,2))*fb1;
-           if(fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
-             for (int k=0; k<af.ats.size(); ++k){
-               if(j!=i && k!=j && k!=i){
-                 //get the thistance to the second atom
-                 dxv2=af.ats[k].x-af.ats[i].x;
-                 dyv2=af.ats[k].y-af.ats[i].y;
-                 dzv2=af.ats[k].z-af.ats[i].z;
-                 micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv2,dyv2,dzv2);
-                 dv2=sqrt(dxv2*dxv2+dyv2*dyv2+dzv2*dzv2);
-                 dxv3=af.ats[j].x-af.ats[k].x;
-                 dyv3=af.ats[j].y-af.ats[k].y;
-                 dzv3=af.ats[j].z-af.ats[k].z;
-                 micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv3,dyv3,dzv3);
-                 dv3=sqrt(dxv3*dxv3+dyv3*dyv3+dzv3*dzv3);
-                 // get the (cos)angle
-                 cosang=(dxv1*dxv2+dyv1*dyv2+dzv1*dzv2)/(dv1*dv2);
-                 if(fsymG3) g3i[i]+=cos(kg3*acos(cosang))*fb1;
-                 if(fct1){
-                   fb2=fermict(dv2,sct);
-                   fb3=fermict(dv3,sct);
-                 }
-                 if(fct2){
-                   // this is the one used by Beheler
-                   fb2=tanhct(dv2,sct);
-                   fb3=tanhct(dv3,sct);
-                 }
-                 if(fsymG4 || fsymG5 || fsymG6){
-                   expg=pow(1+slambda*cosang,zeta);
-                   if(fsymG4) g4i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2+dv3*dv3))*fb1*fb2*fb3;
-                   if(fsymG5) g5i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2))*fb1*fb2;
-                   if(fsymG6) g6i[i]+=expg*ctg6(dv1,eta,mug6)*ctg6(dv2,eta,mug6);
-                 }
-                 if(fsymG7 || fsymG8){
-                   expg=sin(eta*(acos(cosang)-salpha));
-                   if(fsymG7) g7i[i]+=expg*fb1*fb2;
-                   if(fsymG8) g8i[i]+=expg*ctg8(dv1,nig8,alg8,arg8)*ctg8(dv2,nig8,alg8,arg8);
-                 }
-                 //std::cout<<" FERmi "<<fb1<<" "<<fb2<<" "<<fb3<<"\n";
-                 //dmsd[j]+=dx*dx+dy*dy+dz*dz;
-               }
-             }
-           }
-          }
-       }
-       if(fsymG4 || fsymG5 || fsymG6){
-         g4i[i]/=pow(2,zeta);
-         g5i[i]/=pow(2,zeta);
-         g6i[i]/=pow(2,zeta);
-       }
-       if(fsymG7 || fsymG8){
-         g5i[i]*=0.5;
-         g6i[i]*=0.5;
-       }
-       //std::cout<<i<<" "<<g3i<<"\n";
-       if(fsymG1) std::cout<<g1i[i]<<" ";
-       if(fsymG2) std::cout<<g2i[i]<<" ";
-       if(fsymG3) std::cout<<g3i[i]<<" ";
-       if(fsymG4) std::cout<<g4i[i]<<" ";
-       if(fsymG5) std::cout<<g5i[i]<<" ";
-       if(fsymG6) std::cout<<g6i[i]<<" ";
-       if(fsymG7) std::cout<<g7i[i]<<" ";
-       if(fsymG8) std::cout<<g8i[i]<<" ";
-       std::cout<<"\n";
-    }
- }
-
         if (fstop!=0 && nfr>fstop)  break;
         // reads anyway box and weights, as they are meant to span the whole trajectory
         if (fbox!="" and (fvbox || ffirstcell) )
@@ -989,6 +874,123 @@ int main(int argc, char **argv)
                 uwframe=af;
             }
         }
+
+        if(fsymG1 || fsymG2 || fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
+
+          if (fstop!=0 && nfr>fstop)  break;
+               // reads anyway box and weights, as they are meant to span the whole trajectory
+               //if (fbox!="" and (fvbox || ffirstcell) )
+               //{ for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file.");}
+               //else{ for (int i=0;i<3; ++i) for (int j=0;j<3;++j) CBOX(j,i)=0.0;
+               //     CBOX(0,0)=100000000.0;CBOX(1,1)=100000000.0;CBOX(2,2)=100000000.0;}
+
+           //general stuff
+           double dxv1,dxv2,dxv3,dyv1,dyv2,dyv3,dzv1,dzv2,dzv3,dv1,dv2,dv3,fb1,fb2,fb3,expg,cosang;
+
+           std::valarray<double> g1i(af.ats.size());
+           std::valarray<double> g2i(af.ats.size());
+           std::valarray<double> g3i(af.ats.size());
+           std::valarray<double> g4i(af.ats.size());
+           std::valarray<double> g5i(af.ats.size());
+           std::valarray<double> g6i(af.ats.size());
+           std::valarray<double> g7i(af.ats.size());
+           std::valarray<double> g8i(af.ats.size());
+
+           for (int i=0; i<af.ats.size(); ++i){
+              if(fsymG1) g1i[i]=0.0;
+              if(fsymG2) g2i[i]=0.0;
+              if(fsymG3) g3i[i]=0.0;
+              if(fsymG4) g4i[i]=0.0;
+              if(fsymG5) g5i[i]=0.0;
+              if(fsymG6) g6i[i]=0.0;
+              if(fsymG7) g7i[i]=0.0;
+              if(fsymG8) g8i[i]=0.0;
+              for (int j=0; j<af.ats.size(); ++j){
+                if(j!=i){
+                  //get the distance to the first atom
+                  dxv1=af.ats[j].x-af.ats[i].x;
+                  dyv1=af.ats[j].y-af.ats[i].y;
+                  dzv1=af.ats[j].z-af.ats[i].z;
+                  micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv1,dyv1,dzv1);
+                  dv1=sqrt(dxv1*dxv1+dyv1*dyv1+dzv1*dzv1);
+                  // get the cutoff func
+                  if(fct1){
+                    fb1=fermict(dv1,sct);
+                  }
+                  if(fct2){
+                    // this is the one used by Beheler
+                    fb1=tanhct(dv1,sct);
+                  }
+
+                  if(fsymG1) g1i[i]+=fb1;
+                  if(fsymG2) g2i[i]+=exp(-eta*pow(dv1-rsg2,2))*fb1;
+                  if(fsymG3 || fsymG4 || fsymG5 || fsymG6 || fsymG7 || fsymG8){
+                    for (int k=0; k<af.ats.size(); ++k){
+                      if(j!=i && k!=j && k!=i){
+                        //get the thistance to the second atom
+                        dxv2=af.ats[k].x-af.ats[i].x;
+                        dyv2=af.ats[k].y-af.ats[i].y;
+                        dzv2=af.ats[k].z-af.ats[i].z;
+                        micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv2,dyv2,dzv2);
+                        dv2=sqrt(dxv2*dxv2+dyv2*dyv2+dzv2*dzv2);
+                        dxv3=af.ats[j].x-af.ats[k].x;
+                        dyv3=af.ats[j].y-af.ats[k].y;
+                        dzv3=af.ats[j].z-af.ats[k].z;
+                        micpbc(CBOX(0,0),CBOX(1,1),CBOX(2,2),dxv3,dyv3,dzv3);
+                        dv3=sqrt(dxv3*dxv3+dyv3*dyv3+dzv3*dzv3);
+                        // get the (cos)angle
+                        cosang=(dxv1*dxv2+dyv1*dyv2+dzv1*dzv2)/(dv1*dv2);
+                        if(fsymG3) g3i[i]+=cos(kg3*acos(cosang))*fb1;
+                        if(fct1){
+                          fb2=fermict(dv2,sct);
+                          fb3=fermict(dv3,sct);
+                        }
+                        if(fct2){
+                          // this is the one used by Beheler
+                          fb2=tanhct(dv2,sct);
+                          fb3=tanhct(dv3,sct);
+                        }
+                        if(fsymG4 || fsymG5 || fsymG6){
+                          expg=pow(1+slambda*cosang,zeta);
+                          if(fsymG4) g4i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2+dv3*dv3))*fb1*fb2*fb3;
+                          if(fsymG5) g5i[i]+=expg*exp(-eta*(dv1*dv1+dv2*dv2))*fb1*fb2;
+                          if(fsymG6) g6i[i]+=expg*ctg6(dv1,eta,mug6)*ctg6(dv2,eta,mug6);
+                        }
+                        if(fsymG7 || fsymG8){
+                          expg=sin(eta*(acos(cosang)-salpha));
+                          if(fsymG7) g7i[i]+=expg*fb1*fb2;
+                          if(fsymG8) g8i[i]+=expg*ctg8(dv1,nig8,alg8,arg8)*ctg8(dv2,nig8,alg8,arg8);
+                        }
+                        //std::cout<<" FERmi "<<fb1<<" "<<fb2<<" "<<fb3<<"\n";
+                        //dmsd[j]+=dx*dx+dy*dy+dz*dz;
+                      }
+                    }
+                  }
+                 }
+              }
+              if(fsymG4 || fsymG5 || fsymG6){
+                g4i[i]/=pow(2,zeta);
+                g5i[i]/=pow(2,zeta);
+                g6i[i]/=pow(2,zeta);
+              }
+              if(fsymG7 || fsymG8){
+                g5i[i]*=0.5;
+                g6i[i]*=0.5;
+              }
+              //std::cout<<i<<" "<<g3i<<"\n";
+              if(fsymG1) std::cout<<g1i[i]<<" ";
+              if(fsymG2) std::cout<<g2i[i]<<" ";
+              if(fsymG3) std::cout<<g3i[i]<<" ";
+              if(fsymG4) std::cout<<g4i[i]<<" ";
+              if(fsymG5) std::cout<<g5i[i]<<" ";
+              if(fsymG6) std::cout<<g6i[i]<<" ";
+              if(fsymG7) std::cout<<g7i[i]<<" ";
+              if(fsymG8) std::cout<<g8i[i]<<" ";
+              std::cout<<"\n";
+           }
+        }
+
+
         if (fthermal)
         {
             if (te_u0.rows()==0)
