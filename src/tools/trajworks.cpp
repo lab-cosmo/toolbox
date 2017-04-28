@@ -297,10 +297,10 @@ double get_cv(std::vector<AtomData>& al, unsigned long iat, std::vector<double>&
     return tcv;
 } //End of subroutine
 
-double fermict(double RR, double ctdist)
+double fermict(double RR, double ctdist, double sig)
 {
   double fbb;
-  fbb=1/(1+exp(5.*(-ctdist+RR)));
+  fbb=1/(1+exp((-ctdist+RR)/sig));
   return fbb;
 } //End of subroutine
 
@@ -353,6 +353,7 @@ void banner()
             << " -fsymG7                \n"
             << " -fsymG8                \n"
             << " -fct1     Fermi cutoff function                           \n"
+            << " -fct1sig  Sigma for Fermi cutoff function                 \n"
             << " -fct2     tanh cutoff function                            \n"
             << " -rsg2     Rs param for the symfunc G2                     \n"
             << " -kg3      k param for the symfunc G3                      \n"
@@ -442,7 +443,7 @@ int main(int argc, char **argv)
     fgdr=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
-    double drangeax, drangebx, drangeay, drangeby,  drangeaz, drangebz,sct,eta,zeta,slambda,rsg2,kg3,mug6,salpha,nig8,alg8,arg8;
+    double drangeax, drangebx, drangeay, drangeby,  drangeaz, drangebz,sct,eta,zeta,slambda,rsg2,kg3,mug6,salpha,nig8,alg8,arg8,fct1sig;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
     bool fok=
             //general options
@@ -456,6 +457,7 @@ int main(int argc, char **argv)
             clp.getoption(fsymG7,"fsymG7",false) &&
             clp.getoption(fsymG8,"fsymG8",false) &&
             clp.getoption(fct1,"fct1",true) &&
+            clp.getoption(fct1sig,"fct1sig",0.2) &&
             clp.getoption(fct2,"fct2",false) &&
             clp.getoption(eta,"eta",0.001) &&
             clp.getoption(kg3,"kg3",15.) &&
@@ -915,7 +917,7 @@ int main(int argc, char **argv)
                   dv1=sqrt(dxv1*dxv1+dyv1*dyv1+dzv1*dzv1);
                   // get the cutoff func
                   if(fct1){
-                    fb1=fermict(dv1,sct);
+                    fb1=fermict(dv1,sct,fct1sig);
                   }
                   if(fct2){
                     // this is the one used by Beheler
@@ -942,8 +944,8 @@ int main(int argc, char **argv)
                         cosang=(dxv1*dxv2+dyv1*dyv2+dzv1*dzv2)/(dv1*dv2);
                         if(fsymG3) g3i[i]+=cos(kg3*acos(cosang))*fb1;
                         if(fct1){
-                          fb2=fermict(dv2,sct);
-                          fb3=fermict(dv3,sct);
+                          fb2=fermict(dv2,sct,fct1sig);
+                          fb3=fermict(dv3,sct,fct1sig);
                         }
                         if(fct2){
                           // this is the one used by Beheler
