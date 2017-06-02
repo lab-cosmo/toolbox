@@ -15,7 +15,7 @@ void banner()
             << " USAGE: autocorr -maxlag max-lag [-timestep unit-time]                          \n"
             << "                [-drop ndrop] [-coll] [-runlength lr] [-stride std]             \n"
             << "                [-mean exact_mean] [-sigma exact-sigma] [-s] [-raw]             \n"
-            << "                [-tau exact_tau] [-tau2 exact-tau2] [-h] [-v]                   \n"
+            << "                [-tau exact_tau] [-tau2 exact-tau2] [-h] [-v] [-exptau]         \n"
             << "                [< in | -input file1 file2 ...] > out                           \n"
             << " compute the autocorrelation function of a series of real data points given in  \n"
             << " standard input. the mean and sigma used to compute and normalize the ACF can   \n"
@@ -27,6 +27,7 @@ void banner()
             << " input. if the -s option is selected, the code writes only mean, sigma, tau and \n"
             << " tau2 on a single line, then exit. -v enables verbose output on stderr,         \n"
             << " including progress output. -raw prints non-normalized ACF.                     \n"
+            << " -exptau computes an approximate ACT that is more robust to noise in the tail.  \n"
             << "                                                                                \n";
 }
 
@@ -37,7 +38,7 @@ int main(int argc, char **argv)
     
     CLParser clp(argc, argv);
 
-    bool fhelp, fshort, fverbose, fcoll, fraw;
+    bool fhelp, fshort, fverbose, fcoll, fraw, fexptau;
     std::vector<std::string> datafiles;
     unsigned long ncorr, ndrop, runl, stride;
     bool fok=
@@ -57,6 +58,7 @@ int main(int argc, char **argv)
             clp.getoption(acopts.xtau2,"tau2",1.) &&
             clp.getoption(acopts.f_exact_mean,"mean",false) &&
             clp.getoption(acopts.xmean,"mean",0.) &&
+            clp.getoption(fexptau,"exptau",false) &&
             clp.getoption(fhelp,"h",false) &&
             clp.getoption(fverbose,"v",false) &&
             clp.getoption(fshort,"s",false);
@@ -101,8 +103,28 @@ int main(int argc, char **argv)
         }
     }
     
+    std::valarray<double> t,v,b,ev,eb;
+    AC.fullanalysis(t,v,b,ev,eb);
     if (fverbose) std::cerr << " Finished reading. Now computing ACF and outputting ...\n";
     double mean=AC.mean(), sigma=AC.sigma(), tau=AC.actime();
+    if (fexptau) 
+    {
+        if (fverbose) std::cerr << " Computing autocorrelation time with exponential approximation ...\n";
+        tau = 100*tau; 
+        double ntau=2*tau;
+        while (fabs(1-ntau/tau)>1e-5)
+        {
+            tau = ntau;
+            ntau = -v[0]+0.5;
+            for (int i=0; i<ncorr; ++i)
+            {
+                ntau += v[i]*exp(-t[i]/tau);
+            }
+            ntau*=2;            
+        }
+        tau = ntau;
+    }
+    
     std::cout.precision(8); std::cout.setf(std::ios::scientific); 
     std::cout<<(fshort?"":"# ")
             <<std::setw(15)<<mean<<" "
@@ -136,10 +158,7 @@ int main(int argc, char **argv)
     std::cout<<"#    time   .     acf    .    Dacf    .    block   .   Dblock   .\n";
     
     std::cout.precision(6);
-    std::valarray<double> t,v,b,ev,eb;
-    
-    if (fverbose) std::cerr << " Writing ACF and blocking analysis data ...\n";    
-    AC.fullanalysis(t,v,b,ev,eb);
+    if (fverbose) std::cerr << " Writing ACF and blocking analysis data ...\n";        
     if (fraw) v*=(sigma*sigma);
     for (unsigned long i=0; i<ncorr; ++i)
     {
