@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     if (fexptau) 
     {
         if (fverbose) std::cerr << " Computing autocorrelation time with exponential approximation ...\n";
-        tau = 100*tau; 
+        tau = ncorr*acopts.timestep; 
         double ntau=2*tau;
         while (fabs(1-ntau/tau)>1e-5)
         {
