@@ -115,7 +115,7 @@ int main(int argc, char **argv)
         while (fabs(1-ntau/tau)>1e-5)
         {
             tau = ntau;
-            ntau = -v[0]+0.5;
+            ntau = -v[0]*0.5;
             for (int i=0; i<ncorr; ++i)
             {
                 ntau += v[i]*exp(-t[i]/tau);
