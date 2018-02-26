@@ -135,12 +135,23 @@ int main(int argc, char **argv)
     double outliers;
     HG.get_outliers(outliers);
     std::cout<<"# Total weight: "<< HG.get_totweight() <<"\n# Fraction outside: "<<outliers;
-    if (vw.size()>0)
-    { std::cout<< "  --  triangle kernel binning:  widths  "; for (int i=0; i<ndim; i++) std::cout<<vw[i]<<"  "; }
+    if (vw.size()>0) //!TODO write out which kernel is being used
+    { std::cout<< "  -- kernel binning:  widths  "; for (int i=0; i<ndim; i++) std::cout<<vw[i]<<"  "; }
     std::cout<<"\n";
     std::cout.setf(std::ios::scientific);
 
-    if (!fgnu) std::cout <<HG;
+    if (!fgnu)
+    { 
+         if (faverage)
+         {
+             std::cout<<"# Average normalization "<<ay<<"\n"; 
+             std::cout<<HGY;
+         } 
+         else
+         {
+             std::cout <<HG;
+         }
+    }
     else
     {
         std::valarray<long> ind(ndim); std::valarray<double> cen(ndim); double val, valy;
@@ -152,14 +163,14 @@ int main(int argc, char **argv)
            // prints out the center of the histogram bin
            for (int i=0; i<ndim; i++)
               std::cout<<cen[i]<<"\t";
-           if (!faverage)
-           {
-              std::cout<<val<<"\n";
-           }
-           else
+           if (faverage)
            {
               HGY.get_bin(ind,cen,valy);
               std::cout<<valy/val*ay<<"\n";
+           }
+           else
+           {
+              std::cout<<val<<"\n";
            }
            ind[ndim-1]++;
            for (int i=(ndim-1); i>0; --i)
