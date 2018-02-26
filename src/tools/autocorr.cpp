@@ -120,7 +120,7 @@ int main(int argc, char **argv)
             {
                 ntau += v[i]*exp(-t[i]/tau);
             }
-            ntau*=2;            
+            ntau*=2*acopts.timestep;        
         }
         tau = ntau;
     }
