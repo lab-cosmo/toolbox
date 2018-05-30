@@ -838,7 +838,6 @@ int main(int argc, char **argv)
                 double va,vb;
                 for (int i=0; i<3; ++i)
                 {
-                    hgo[i].walls=HGBPeriodic;
                     if (densw==0.) hgo[i].window=HGWDelta; else hgo[i].window=(hwin==HGWDelta?HGWTriangle:hwin);
                     switch(i)
                     {
@@ -846,6 +845,10 @@ int main(int argc, char **argv)
                         case 1: va=drangeay; vb=drangeby; break;
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
+                    
+                    if (vb-va == 1) { hgo[i].walls=HGBPeriodic; }
+                    else { hgo[i].walls=HGBHard; }
+                    
 
                     for (int k=0; k<hgo[i].boundaries.size();k++)
                         hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1);
