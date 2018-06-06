@@ -1,7 +1,7 @@
 # DO NOT MODIFY THIS FILE. Please edit the appropriate arch file instead
 # Sane defaults for compiling on a system that 
 # has all the libraries installed
-LDFLAGS=-llapack -lblas -lfftw -lfftw3
+LDFLAGS=-llapack -lblas -lfftw3
 CXX=g++
 CXXFLAGS=-O3 -ftracer -g 
 
