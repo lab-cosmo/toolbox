@@ -751,7 +751,19 @@ int main(int argc, char **argv)
                 //reads reference frame from external file
                 std::ifstream ifref(fref.c_str()); bool succ;
                 if (fdlp) succ=ReadDLPConf(ifref,reffr);
-                else if (fxyz) succ=ReadXYZFrame(ifref,reffr);
+                else if (fxyz)
+                {
+                   succ=ReadXYZFrame(ifref,reffr);
+                   reffr.nprops["axx"]=CM(0,0);  // picks the cell from the box
+                   reffr.nprops["axy"]=CM(0,1);
+                   reffr.nprops["axz"]=CM(0,2);                                      
+                   reffr.nprops["ayx"]=CM(1,0);
+                   reffr.nprops["ayy"]=CM(1,1);                                      
+                   reffr.nprops["ayz"]=CM(1,2);
+                   reffr.nprops["azx"]=CM(2,0);                                      
+                   reffr.nprops["azy"]=CM(2,1);
+                   reffr.nprops["azz"]=CM(2,2);                                      
+                }
                 else if (fpdb) succ=ReadPDBFrame(ifref,reffr);
                 else ERROR("I don't know how to read this...");
 
