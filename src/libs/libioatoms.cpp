@@ -9,6 +9,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <regex>
 
 namespace toolbox {
 
@@ -23,6 +24,20 @@ bool ReadXYZFrame(std::istream& istr, AtomFrame& curfr)
     ss.clear(); ss<<line;
     ss>>nat;
     if (!getline(istr,curfr.comment)) ERROR("Read failed while getting frame "<<curfr.index<<".");
+    
+    std::regex cell_regex("CELL.abcABC.:"); 
+    if (std::regex_search(curfr.comment, cell_regex))
+    {
+		ss.clear(); ss<<curfr.comment;
+		std::string dummy;
+		double A, B, C, a, b, c;
+		ss >> dummy >> dummy >> A >> B >> C >> a >> b >> c;		
+		curfr.nprops["axx"] = A;
+		curfr.nprops["ayy"] = B; 
+		curfr.nprops["azz"] = C;        
+		curfr.nprops["axy"] = curfr.nprops["axz"] = curfr.nprops["ayx"] = curfr.nprops["ayz"] = curfr.nprops["azx"] = curfr.nprops["azy"] = 0;
+	}
+    
     for (i=0; i<nat && getline(istr, line); ++i)
     {
         ss.clear(); ss<<line;

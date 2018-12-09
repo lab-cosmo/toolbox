@@ -737,6 +737,7 @@ int main(int argc, char **argv)
             if (fbox!="") {  CM = CBOX;  }
             else if (fdlp) { af2cm(af,CM); }
             else if (fpdb) { af2cm(af,CM); }
+            else if (fxyz && af.nprops["axx"]>0.0) { af2cm(af,CM); }
             else fhavecell=false;
             if (fhavecell)
             {
@@ -858,7 +859,7 @@ int main(int argc, char **argv)
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
                     
-                    if (vb-va == 1) { hgo[i].walls=HGBPeriodic; }
+                    if (vb-va == 1) { std::cout<<"PERIODIC DENSITY APPLIED ALONG AXIS " << i<<"\n"; hgo[i].walls=HGBPeriodic; }
                     else { hgo[i].walls=HGBHard; }
                     
 
