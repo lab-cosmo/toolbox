@@ -28,14 +28,26 @@ bool ReadXYZFrame(std::istream& istr, AtomFrame& curfr)
     std::regex cell_regex("CELL.abcABC.:"); 
     if (std::regex_search(curfr.comment, cell_regex))
     {
-		ss.clear(); ss<<curfr.comment;
-		std::string dummy;
-		double A, B, C, a, b, c;
-		ss >> dummy >> dummy >> A >> B >> C >> a >> b >> c;		
-		curfr.nprops["axx"] = A;
-		curfr.nprops["ayy"] = B; 
-		curfr.nprops["azz"] = C;        
-		curfr.nprops["axy"] = curfr.nprops["axz"] = curfr.nprops["ayx"] = curfr.nprops["ayz"] = curfr.nprops["azx"] = curfr.nprops["azy"] = 0;
+        ss.clear(); ss<<curfr.comment;
+        std::string dummy;
+        double A, B, C, a, b, c;
+        ss >> dummy >> dummy >> A >> B >> C >> a >> b >> c;		
+        //TODO - convert properly also when it's non-orthorhombic
+        curfr.nprops["axx"] = A;
+        curfr.nprops["ayy"] = B; 
+        curfr.nprops["azz"] = C;        
+        curfr.nprops["axy"] = curfr.nprops["axz"] = curfr.nprops["ayx"] = curfr.nprops["ayz"] = curfr.nprops["azx"] = curfr.nprops["azy"] = 0;
+	}
+    std::regex libatom_regex("Lattice=[\"']([^\"']*)['\"]"); //[\"']([^\"']*)['\"]
+    if (std::regex_search(curfr.comment, libatom_regex))
+    {
+        std::smatch match;
+        if (std::regex_search(curfr.comment, match, libatom_regex) ){
+            ss.clear(); ss<<match[1];
+            ss>>curfr.nprops["axx"]>>curfr.nprops["axy"]>>curfr.nprops["axz"]>>
+                curfr.nprops["ayx"]>>curfr.nprops["ayy"]>>curfr.nprops["ayz"]>>
+                curfr.nprops["azx"]>>curfr.nprops["azy"]>>curfr.nprops["azz"];
+        }
 	}
     
     for (i=0; i<nat && getline(istr, line); ++i)

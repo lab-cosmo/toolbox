@@ -323,11 +323,18 @@ void banner()
             << " -hwin     window for all histo (triangle|box|delta|gauss-[1,2,3,5]) [delta]    \n"
             << " -hwinfac  size of the window, as a function of the bin size [1.0]              \n"
             << " -weights file read statistical log-weights of frames from an external file     \n"
-            << " ## g(r) OPTIONS:   activate by -gr                                             \n"
+            << " ## g(r) OPTIONS:   activate by hgo                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
             << " -gr2      label of the second specie [*]                                       \n"
             << " -grmax    maximum distance to compute g(r) [5]                                 \n"
             << " -grbins   number of bins in the histogram for g(r) [100]                       \n"
+            << " ## g3b(r,r',w) OPTIONS:   activate by -g3b                                     \n"
+            << " -g3b1     label of the first (central) specie  [*]                             \n"
+            << " -g3b2     label of the second specie [*]                                       \n"
+            << " -g3b3     label of the second specie [*]                                       \n"
+            << " -grmax    maximum distance to compute g(r) [5]                                 \n"
+            << " -grbins   number of bins in the histogram for g(r) [100]                       \n"
+            << " -gwbins   number of angle bins in the histogram for g(w) [100]                 \n"
             << " ## order parameter OPTIONS: activate by -cv                                    \n"
             << " -cvat     atom types to compute cv for [*]                                     \n"
             << " -cvtype   index of cv type [1]                                                 \n"
@@ -378,9 +385,9 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
-    std::string lgdr1, lgdr2, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
-    double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
+    bool fgdr=false, fg3b=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    std::string lgdr1, lgdr2, lg3b1, lg3b2, lg3b3, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
+    double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, gwbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
     bool fok=
@@ -408,6 +415,12 @@ int main(int argc, char **argv)
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
             clp.getoption(gdrbins,"grbins",(unsigned long)100) &&
+            //g3b(r,r',w) options
+            clp.getoption(fg3b,"g3b",false) &&            
+            clp.getoption(lg3b1,"g3b1",std::string("*")) &&
+            clp.getoption(lg3b2,"g3b2",std::string("*")) &&
+            clp.getoption(lg3b3,"g3b3",std::string("*")) &&
+            clp.getoption(gwbins,"gwbins",(unsigned long)100) &&
             //vvacf options
             clp.getoption(fvvac,"vvac",false) &&
             clp.getoption(fvvacbox,"vvftbox",false) &&
@@ -482,13 +495,13 @@ int main(int argc, char **argv)
     else ERROR("Unsupported histogram windowing mode");
 
 
-    AtomFrame af; std::vector<AtomData> al1, al2, ldip;
+    AtomFrame af; std::vector<AtomData> al1, al2, al3, ldip;
     AtomData dip_tx, dip_cur; double tcharge=0.;
     Histogram<double> hgdr(0.,cogdr, gdrbins);
     hgdr.get_options(hgwo); hgwo.window=hwin; hgwo.walls=HGBHard;
     hgwo.window_width=(hgwo.boundaries[1]-hgwo.boundaries[0])*hwinfac;   hgdr.set_options(hgwo);
 
-    double d12, dx, dy, dz, cog2=cogdr*cogdr, gdrw, gdrwtot;
+    double d12, dx, dy, dz, cog2=cogdr*cogdr, gdrw, gdrwtot, g3bw, g3bwtot;
     int nfr=0, npfr=0;
     
     //velocity-velocity correlation stuff
@@ -498,6 +511,20 @@ int main(int argc, char **argv)
     unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
     std::valarray<AtomFrame> msdbuff(msdlag);
     std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; FMatrix<bool>  fmsd_inc(msdlag,msdlag);
+
+    //3-body correlation histogram
+    std::valarray<HGOptions<Histogram<double> > > h3bo(3);
+
+    h3bo[0].boundaries.resize(gdrbins);
+    h3bo[1].boundaries.resize(gdrbins);
+    h3bo[2].boundaries.resize(gwbins);
+    for (int i=0; i<3; ++i) { 
+        for (int k=0; k<h3bo[i].boundaries.size();k++)
+            h3bo[i].boundaries[k]=(i<2?0:-1)+k*(i<2?cogdr:2.0)/(h3bo[i].boundaries.size()-1);
+        h3bo[i].window=hwin; h3bo[i].walls = HGBHard; 
+        h3bo[i].window_width=(h3bo[i].boundaries[1]-h3bo[i].boundaries[0])*hwinfac;
+    }
+    NDHistogram<double> n3b(h3bo);
 
     //density histograms
     std::valarray<HGOptions<Histogram<double> > > hgo(3);
@@ -575,13 +602,13 @@ int main(int argc, char **argv)
     FMatrix<double> te_u0, te_uiuj;
 
     //initializes output streams
-    std::ostream *ogdr, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
+    std::ostream *ogdr, *og3b, *ocv, *ovvac, *omsd, *odipole, *odens, *odtraj, *odpov, *opca, *opcaxyz, *opd, *op3d, *opproj, *otherm, *ocharge;
     std::cout.precision(8); std::cout.width(15); std::cout.setf(std::ios::scientific);
 
     if (prefix=="")
     {
         //everything goes to stdout
-        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=&std::cout;
+        ocv=ogdr=ovvac=omsd=odipole=odens=odtraj=opca=opcaxyz=opd=op3d=opproj=otherm=ocharge=og3b=&std::cout;
     }
     else
     {
@@ -589,6 +616,11 @@ int main(int argc, char **argv)
         {
             ogdr=new std::ofstream((prefix+std::string(".gdr")).c_str());
             (*ogdr).precision(8); (*ogdr).width(15); (*ogdr).setf(std::ios::scientific);
+        }
+        if (fg3b)
+        {
+            og3b=new std::ofstream((prefix+std::string(".g3b")).c_str());
+            (*og3b).precision(8); (*og3b).width(15); (*og3b).setf(std::ios::scientific);
         }
         if (fcv)
         {
@@ -777,6 +809,7 @@ int main(int argc, char **argv)
             if (fbox!="") { CM = CBOX; }
             else if (fdlp) { af2cm(af,CM); }
             else if (fpdb) { af2cm(af,CM); }
+            else if (fxyz && af.nprops["axx"]>0.0) { af2cm(af,CM); }
             MatrixInverse(CM,ICM);
             //updates the average volume
             cvolume=cvolume+(fabs(CM(0,0)*CM(1,1)*CM(2,2)+CM(0,1)*CM(1,2)*CM(2,0)+CM(1,0)*CM(2,1)*CM(0,2)-
@@ -1205,6 +1238,60 @@ int main(int argc, char **argv)
             }
             if (gdrw>0.0) gdrwtot+=statweight*gdrw;   // total weight to be considered when renormalizing g(r)
         }
+        if (fg3b)
+        {
+            if (!fhavecell) ERROR("You must provide cell data in order to compute g(r)!");
+            al1.clear(); al2.clear();  al3.clear();
+            if (lg3b1=="*") al1=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
+                if (af.ats[i].name==lg3b1) al1.push_back(af.ats[i]);
+            if (lg3b2=="*") al2=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
+                if (af.ats[i].name==lg3b2) al2.push_back(af.ats[i]);
+            if (lg3b3=="*") al3=af.ats;
+            else for (unsigned long i=0; i<af.ats.size(); ++i)
+                if (af.ats[i].name==lg3b3) al3.push_back(af.ats[i]);
+            g3bw=0.0;
+            for (unsigned long i=0; i<al1.size(); ++i)
+                for (unsigned long j=0; j<al2.size(); ++j)
+            { if (i==j) continue;
+                    for (unsigned long k=0; k<al3.size(); ++k)
+            {
+                if (i==k || j==k) continue;
+                g3bw+=1.0;
+                
+                double dx12, dy12, dz12, dx13, dy13, dz13;
+                dx12=al1[i].x-al2[j].x;
+                dy12=al1[i].y-al2[j].y;
+                dz12=al1[i].z-al2[j].z;
+                micmat(ICM,dx12,dy12,dz12);
+                micpbc(1.,1.,1.,dx12,dy12,dz12);
+                micmat(CM,dx12,dy12,dz12);
+                
+
+                if (dx12>cogdr || dy12> cogdr || dz12>cogdr) continue;
+                d12=dx12*dx12+dy12*dy12+dz12*dz12;
+                if (d12>cog2||d12==0.) continue;
+                
+                dx13=al1[i].x-al3[k].x;
+                dy13=al1[i].y-al3[k].y;
+                dz13=al1[i].z-al3[k].z;
+                micmat(ICM,dx13,dy13,dz13);
+                micpbc(1.,1.,1.,dx13,dy13,dz13);
+                micmat(CM,dx13,dy13,dz13);
+                
+                if (dx13>cogdr || dy13> cogdr || dz13>cogdr) continue;
+                double d13=dx13*dx13+dy13*dy13+dz13*dz13;
+                if (d13>cog2||d13==0.) continue;
+                std::valarray<double> g3bdata(3);
+                g3bdata[0] = sqrt(d12);
+                g3bdata[1] = sqrt(d13);
+                g3bdata[2] = (dx12*dx13+dy12*dy13+dz12*dz13)/(g3bdata[0]*g3bdata[1]);
+                n3b.add(g3bdata, statweight);  // this has the possibility of being weighted
+            }
+            }
+            if (g3bw>0.0) g3bwtot+=statweight*g3bw;   // total weight to be considered when renormalizing g(r)
+        }
         if (fvvac)
         {
             if (fvbox) ERROR("OOPS... Variable box is not implemented for this calculation...."); //PLACEHOLDER uhm, box shouldn't really matters here....
@@ -1329,6 +1416,14 @@ int main(int argc, char **argv)
         else gr*=hgdr.samples()/(gdrwtot/cvolume);
         for (unsigned long i=0; i<r.size(); ++i)
             (*ogdr)<<r[i]<<" "<<gr[i]<<std::endl;
+    }
+    if (fg3b)
+    {
+        
+        std::cerr<<"# PRINTING OUT g3b(r,r',w) FOR "<<lg3b1<<" - "<<lg3b2<<" - "<<lg3b3<<" TRIPLET\n";
+        // RAW OUTPUT
+        (*og3b) << n3b;
+        (*og3b).flush();
     }
     if (fpd)
     {
