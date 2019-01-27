@@ -332,6 +332,7 @@ void banner()
             << " -g3b1     label of the first (central) specie  [*]                             \n"
             << " -g3b2     label of the second specie [*]                                       \n"
             << " -g3b3     label of the second specie [*]                                       \n"
+            << " -g3bself  include also self-terms                                              \n"
             << " -grmax    maximum distance to compute g(r) [5]                                 \n"
             << " -grbins   number of bins in the histogram for g(r) [100]                       \n"
             << " -gwbins   number of angle bins in the histogram for g(w) [100]                 \n"
@@ -385,7 +386,7 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fg3b=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    bool fgdr=false, fg3b=false, fg3bself=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, lg3b1, lg3b2, lg3b3, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, gwbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
@@ -410,13 +411,14 @@ int main(int argc, char **argv)
             clp.getoption(hwinfac,"hwinfac",1.) &&
             clp.getoption(fweights,"weights",std::string("")) &&
             //g(r) options
-            clp.getoption(fgdr,"gr",false) &&            
+            clp.getoption(fgdr,"gr",false) &&
             clp.getoption(lgdr1,"gr1",std::string("*")) &&
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
             clp.getoption(cogdr,"grmax",5.) &&
             clp.getoption(gdrbins,"grbins",(unsigned long)100) &&
             //g3b(r,r',w) options
-            clp.getoption(fg3b,"g3b",false) &&            
+            clp.getoption(fg3b,"g3b",false) &&
+            clp.getoption(fg3bself,"g3bself",false) &&
             clp.getoption(lg3b1,"g3b1",std::string("*")) &&
             clp.getoption(lg3b2,"g3b2",std::string("*")) &&
             clp.getoption(lg3b3,"g3b3",std::string("*")) &&
@@ -503,12 +505,12 @@ int main(int argc, char **argv)
 
     double d12, dx, dy, dz, cog2=cogdr*cogdr, gdrw, gdrwtot, g3bw, g3bwtot;
     int nfr=0, npfr=0;
-    
+
     //velocity-velocity correlation stuff
     double vvnat=0; std::valarray<AutoCorrelation<double> > vvacf; std::valarray<bool> fvvac_inc;
 
     //MSD stuff
-    unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag); 
+    unsigned long imsd=0 , msdnat=0; std::valarray<unsigned long> nmsd(msdlag);
     std::valarray<AtomFrame> msdbuff(msdlag);
     std::valarray<double> dmsd(msdlag); nmsd=0; dmsd=0.; FMatrix<bool>  fmsd_inc(msdlag,msdlag);
 
@@ -518,10 +520,10 @@ int main(int argc, char **argv)
     h3bo[0].boundaries.resize(gdrbins);
     h3bo[1].boundaries.resize(gdrbins);
     h3bo[2].boundaries.resize(gwbins);
-    for (int i=0; i<3; ++i) { 
+    for (int i=0; i<3; ++i) {
         for (int k=0; k<h3bo[i].boundaries.size();k++)
             h3bo[i].boundaries[k]=(i<2?0:-1)+k*(i<2?cogdr:2.0)/(h3bo[i].boundaries.size()-1);
-        h3bo[i].window=hwin; h3bo[i].walls = HGBHard; 
+        h3bo[i].window=hwin; h3bo[i].walls = HGBHard;
         h3bo[i].window_width=(h3bo[i].boundaries[1]-h3bo[i].boundaries[0])*hwinfac;
     }
     NDHistogram<double> n3b(h3bo);
@@ -695,19 +697,19 @@ int main(int argc, char **argv)
     rng.RUGenerator().seed(100);
 
     //cell matrix reading
-    std::ifstream ifbox; 
+    std::ifstream ifbox;
     FMatrix<double> CBOX(3,3), CM(3,3), ICM(3,3); double cvolume=0.; bool fhavecell=false;
-   
+
     //charge dictionary
     std::ifstream ifqat;
     std::map<std::string, double> qmap;
-    if (fqat!="") 
+    if (fqat!="")
     {
        std::string qlabel; double qq;
        ifqat.open(fqat.c_str());
        while (ifqat.good())
        {
-          ifqat>>qlabel>>qq; 
+          ifqat>>qlabel>>qq;
           qmap[qlabel]=qq;
        }
     }
@@ -733,7 +735,7 @@ int main(int argc, char **argv)
     double statweight=1.0, stattot=0.0;
     if (fbox!="") ifbox.open(fbox.c_str());
     if (fweights!="") ifweights.open(fweights.c_str());
-    ffirstcell=true;    
+    ffirstcell=true;
     while ((fdlp && ReadDLPFrame(std::cin,af))||(fpdb && ReadPDBFrame(std::cin,af))||(fxyz && ReadXYZFrame(std::cin,af)))
     {
         ++nfr;
@@ -743,7 +745,7 @@ int main(int argc, char **argv)
         { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file."); }
         if (fweights!="")
         {
-            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs 
+            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs
             if (!ifweights.good()) ERROR("Format error in weights file.");
         }
         if (fqat!="")
@@ -752,7 +754,7 @@ int main(int argc, char **argv)
            {
               af.ats[i].nprops["charge"]=qmap[af.ats[i].name];
            }
-        }        
+        }
         if ((fstart!=0 && nfr<fstart) || (fstep>0 && nfr%fstep!=0))
         { std::cerr<<"Skipping frame   "<<std::setw(10)<<std::setiosflags(std::ios::right)<<nfr<<"\r"; continue; }
 
@@ -762,9 +764,9 @@ int main(int argc, char **argv)
             if (af.ats.size()!=vlab.size()) ERROR("Atom number mismatch at frame"<<nfr);
             for( int i=0 ; i<af.ats.size(); ++i ) af.ats[i].name=vlab[i];
         }
-        npfr++; 
-        if (!fhavecell) //sets up unit cell for PBC  
-        {            
+        npfr++;
+        if (!fhavecell) //sets up unit cell for PBC
+        {
             fhavecell=true;
             if (fbox!="") {  CM = CBOX;  }
             else if (fdlp) { af2cm(af,CM); }
@@ -789,13 +791,13 @@ int main(int argc, char **argv)
                    succ=ReadXYZFrame(ifref,reffr);
                    reffr.nprops["axx"]=CM(0,0);  // picks the cell from the box
                    reffr.nprops["axy"]=CM(0,1);
-                   reffr.nprops["axz"]=CM(0,2);                                      
+                   reffr.nprops["axz"]=CM(0,2);
                    reffr.nprops["ayx"]=CM(1,0);
-                   reffr.nprops["ayy"]=CM(1,1);                                      
+                   reffr.nprops["ayy"]=CM(1,1);
                    reffr.nprops["ayz"]=CM(1,2);
-                   reffr.nprops["azx"]=CM(2,0);                                      
+                   reffr.nprops["azx"]=CM(2,0);
                    reffr.nprops["azy"]=CM(2,1);
-                   reffr.nprops["azz"]=CM(2,2);                                      
+                   reffr.nprops["azz"]=CM(2,2);
                 }
                 else if (fpdb) succ=ReadPDBFrame(ifref,reffr);
                 else ERROR("I don't know how to read this...");
@@ -891,10 +893,10 @@ int main(int argc, char **argv)
                         case 1: va=drangeay; vb=drangeby; break;
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
-                    
+
                     if (vb-va == 1) { std::cout<<"PERIODIC DENSITY APPLIED ALONG AXIS " << i<<"\n"; hgo[i].walls=HGBPeriodic; }
                     else { hgo[i].walls=HGBHard; }
-                    
+
 
                     for (int k=0; k<hgo[i].boundaries.size();k++)
                         hgo[i].boundaries[k]=va+k*(vb-va)/(hgo[i].boundaries.size()-1);
@@ -1117,7 +1119,7 @@ int main(int argc, char **argv)
             if (npdat==0)
             {
                 fpd_inc.resize(af.ats.size()); fpd_inc=false;
-		for(unsigned long i=0; i<af.ats.size(); ++i)  if (lpdat=="*" || chk_sel(af.ats[i].name,lpdat) ) { fpd_inc[i]=true; npdat++; }
+        for(unsigned long i=0; i<af.ats.size(); ++i)  if (lpdat=="*" || chk_sel(af.ats[i].name,lpdat) ) { fpd_inc[i]=true; npdat++; }
             }
             FMatrix<double> dpab(3,3,0.);
             for (unsigned long m=0; m<af.ats.size(); ++m) if (fpd_inc[m])
@@ -1210,27 +1212,30 @@ int main(int argc, char **argv)
         {
             if (!fhavecell) ERROR("You must provide cell data in order to compute g(r)!");
             al1.clear(); al2.clear();
+            std::vector<int> il1, il2;
+            il1.clear(); il2.clear();
+
             if (lgdr1=="*") al1=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lgdr1) al1.push_back(af.ats[i]);
+                if (af.ats[i].name==lgdr1) { al1.push_back(af.ats[i]); il1.push_back(i); }
             if (lgdr2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lgdr2) al2.push_back(af.ats[i]);
-            
+                if (af.ats[i].name==lgdr2) { al2.push_back(af.ats[i]); il2.push_back(i); }
+
             gdrw=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
                 for (unsigned long j=0; j<al2.size(); ++j)
             {
-                if (i==j) continue;
+                if (il1[i]==il2[j]) continue;
                 gdrw+=1.0;
-                
+
                 dx=al1[i].x-al2[j].x;
                 dy=al1[i].y-al2[j].y;
                 dz=al1[i].z-al2[j].z;
                 micmat(ICM,dx,dy,dz);
                 micpbc(1.,1.,1.,dx,dy,dz);
                 micmat(CM,dx,dy,dz);
-                
+
                 if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
                 d12=dx*dx+dy*dy+dz*dz;
                 if (d12>cog2||d12==0.) continue;
@@ -1242,24 +1247,26 @@ int main(int argc, char **argv)
         {
             if (!fhavecell) ERROR("You must provide cell data in order to compute g(r)!");
             al1.clear(); al2.clear();  al3.clear();
+            std::vector<int> il1, il2, il3;
+            il1.clear(); il2.clear(); il3.clear();
             if (lg3b1=="*") al1=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lg3b1) al1.push_back(af.ats[i]);
+                if (af.ats[i].name==lg3b1) { al1.push_back(af.ats[i]); il1.push_back(i); }
             if (lg3b2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lg3b2) al2.push_back(af.ats[i]);
+                if (af.ats[i].name==lg3b2) { al2.push_back(af.ats[i]); il2.push_back(i); }
             if (lg3b3=="*") al3=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lg3b3) al3.push_back(af.ats[i]);
+                if (af.ats[i].name==lg3b3) { al3.push_back(af.ats[i]); il3.push_back(i); }
             g3bw=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
                 for (unsigned long j=0; j<al2.size(); ++j)
-            { if (i==j) continue;
+            { if (il1[i]==il2[j] and !fg3bself) continue;
                     for (unsigned long k=0; k<al3.size(); ++k)
             {
-                if (i==k || j==k) continue;
+                if ((il1[i]==il3[k] || il2[j]==il3[k]) and !fg3bself) continue;
                 g3bw+=1.0;
-                
+
                 double dx12, dy12, dz12, dx13, dy13, dz13;
                 dx12=al1[i].x-al2[j].x;
                 dy12=al1[i].y-al2[j].y;
@@ -1267,22 +1274,22 @@ int main(int argc, char **argv)
                 micmat(ICM,dx12,dy12,dz12);
                 micpbc(1.,1.,1.,dx12,dy12,dz12);
                 micmat(CM,dx12,dy12,dz12);
-                
+
 
                 if (dx12>cogdr || dy12> cogdr || dz12>cogdr) continue;
                 d12=dx12*dx12+dy12*dy12+dz12*dz12;
-                if (d12>cog2||d12==0.) continue;
-                
+                if (d12>cog2) continue;
+
                 dx13=al1[i].x-al3[k].x;
                 dy13=al1[i].y-al3[k].y;
                 dz13=al1[i].z-al3[k].z;
                 micmat(ICM,dx13,dy13,dz13);
                 micpbc(1.,1.,1.,dx13,dy13,dz13);
                 micmat(CM,dx13,dy13,dz13);
-                
+
                 if (dx13>cogdr || dy13> cogdr || dz13>cogdr) continue;
                 double d13=dx13*dx13+dy13*dy13+dz13*dz13;
-                if (d13>cog2||d13==0.) continue;
+                if (d13>cog2) continue;
                 std::valarray<double> g3bdata(3);
                 g3bdata[0] = sqrt(d12);
                 g3bdata[1] = sqrt(d13);
@@ -1326,26 +1333,26 @@ int main(int argc, char **argv)
         }
         if (fmsd)
         {
-            
+
             if (npfr==1){ // mark the species to be used
                           // to compute the MSD
                 fmsd_inc.resize(msdlag,af.ats.size()); fmsd_inc.all()=false;
             }
-            
+
             fmsd_inc.row((npfr-1)%msdlag)=false;
             if (lmsd=="*") { fmsd_inc.row((npfr-1)%msdlag)=true; }
             else for(unsigned long i=0; i<af.ats.size(); ++i)
-                if(af.ats[i].name==lmsd) { 
+                if(af.ats[i].name==lmsd) {
                     fmsd_inc((npfr-1)%msdlag,i)=true;
                 }
-                
-            /*std::valarray<bool> tempor(af.ats.size()); 
+
+            /*std::valarray<bool> tempor(af.ats.size());
             tempor=fmsd_inc.row((npfr-1)%msdlag);
             std::cerr<<tempor<<"\n";*/
             // fill the buffer
             msdbuff[(npfr-1)%msdlag] = af;
             if((npfr-1)<(msdlag-1)) continue;
-            
+
             // compute the avg MSD
             imsd = (npfr-1)-(msdlag-1);
             for (unsigned long j=0; j<msdlag; ++j) {
@@ -1358,9 +1365,9 @@ int main(int argc, char **argv)
                        //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
                        dmsd[j]+=dx*dx+dy*dy+dz*dz;
                        nmsd[j]++;
-                    }                
+                    }
                 }
-            
+
         }
         if (fdipole)
         {
@@ -1382,7 +1389,7 @@ int main(int argc, char **argv)
                 {
                    if (af.ats[i].name == "H") af.ats[i].nprops["charge"]=1.0;
                    if (af.ats[i].name == "O") af.ats[i].nprops["charge"]=-2.0;
-                } 
+                }
                 dip_cur.x+=dx*af.ats[i].nprops["charge"];
                 dip_cur.y+=dy*af.ats[i].nprops["charge"];
                 dip_cur.z+=dz*af.ats[i].nprops["charge"];
@@ -1403,13 +1410,13 @@ int main(int argc, char **argv)
 
     if (fgdr)
     {
-        
+
         std::cerr<<"# PRINTING OUT g(r) FOR "<<lgdr1<<" - "<<lgdr2<<" PAIR\n";
         std::valarray<double> r, w, gr;
         hgdr.get_bins(r, w, gr);
         for (unsigned long i=0; i<r.size(); ++i)
         { gr[i]=gr[i]/(4*constant::pi*r[i]*r[i]); }
-        
+
         //bins = bins/ndata -> Int bins = 1
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
@@ -1419,7 +1426,7 @@ int main(int argc, char **argv)
     }
     if (fg3b)
     {
-        
+
         std::cerr<<"# PRINTING OUT g3b(r,r',w) FOR "<<lg3b1<<" - "<<lg3b2<<" - "<<lg3b3<<" TRIPLET\n";
         // RAW OUTPUT
         (*og3b) << n3b;
@@ -1494,7 +1501,7 @@ int main(int argc, char **argv)
         vvt=0.; vvw=0.;
         for (unsigned long it=0; it<vvlag; ++it)
         {
-            for (unsigned long i=0; i<vvnat; ++i) if (vvacf[3*i].sigma()>0.0) 
+            for (unsigned long i=0; i<vvnat; ++i) if (vvacf[3*i].sigma()>0.0)
                 vvt[it]+=vvacf[3*i][it]*vvacf[3*i].sigma()*vvacf[3*i].sigma()
                         +vvacf[3*i+1][it]*vvacf[3*i+1].sigma()*vvacf[3*i+1].sigma()
                         +vvacf[3*i+2][it]*vvacf[3*i+2].sigma()*vvacf[3*i+2].sigma();
@@ -1527,17 +1534,17 @@ int main(int argc, char **argv)
                            //cmsd+=(dx*dx+dy*dy+dz*dz)/msdnat[imsd%msdlag];
                            dmsd[j]+=dx*dx+dy*dy+dz*dz;
                            nmsd[j]++;
-                        }                
-                    
+                        }
+
                 }
         }
-        
+
         std::cerr<<"# PRINTING OUT msd\n";
         for (unsigned long it=0; it<msdlag; ++it)
         {
             (*omsd) <<it*dt<<"  "<<dmsd[it]/nmsd[it]<<std::endl;
         }
-        
+
     }
     if (fdipole)
     {
