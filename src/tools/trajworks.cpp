@@ -1249,6 +1249,7 @@ int main(int argc, char **argv)
             al1.clear(); al2.clear();  al3.clear();
             std::vector<int> il1, il2, il3;
             il1.clear(); il2.clear(); il3.clear();
+
             if (lg3b1=="*") al1=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
                 if (af.ats[i].name==lg3b1) { al1.push_back(af.ats[i]); il1.push_back(i); }
@@ -1290,10 +1291,12 @@ int main(int argc, char **argv)
                 if (dx13>cogdr || dy13> cogdr || dz13>cogdr) continue;
                 double d13=dx13*dx13+dy13*dy13+dz13*dz13;
                 if (d13>cog2) continue;
+
                 std::valarray<double> g3bdata(3);
                 g3bdata[0] = sqrt(d12);
                 g3bdata[1] = sqrt(d13);
                 g3bdata[2] = (dx12*dx13+dy12*dy13+dz12*dz13)/(g3bdata[0]*g3bdata[1]);
+
                 n3b.add(g3bdata, statweight);  // this has the possibility of being weighted
             }
             }
