@@ -3,7 +3,7 @@
 # has all the libraries installed
 LDFLAGS=-llapack -lblas -lfftw3
 CXX=g++
-CXXFLAGS=-O3 -ftracer -g 
+CXXFLAGS=-O3 -ftracer -g  -DTB_FFTAC
 
 REL=../..
 ifneq ($(ARCH),)

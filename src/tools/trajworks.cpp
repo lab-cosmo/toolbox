@@ -345,6 +345,7 @@ void banner()
             << " -dbins    number of bins (either -dbins n or -dbins nx,ny,nz)                  \n"
             << " -dbinw    use a box function to smear the density over a DISTANCE w            \n"
             << " -dfold    fold the density in a smaller cell (-dfold fx,fy,fz)                 \n"
+            << " -dnopbc   do not apply pbc to the density. cell is still read to set limits    \n"            
             << " -drange   only accumulate density in the specified FOLDED range                \n"
             << "           (-drange ax,bx,ay,by,az,bz. defaults to -0.5,0.5,-0.5,0.5,-0.5,0.5)  \n"
             << " -dtraj    also prints out a trajectory file of the (aligned) geometries        \n"
@@ -386,7 +387,7 @@ int main(int argc, char **argv)
 {
     CLParser clp(argc, argv);
 
-    bool fgdr=false, fg3b=false, fg3bself=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
+    bool fgdr=false, fg3b=false, fg3bself=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdnopbc=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, lg3b1, lg3b2, lg3b3, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
     double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, gwbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
@@ -441,6 +442,7 @@ int main(int argc, char **argv)
             clp.getoption(cvpars,"cvpars",std::vector<double>(0)) &&
             //density options
             clp.getoption(fdens,"dens",false) &&
+            clp.getoption(fdnopbc,"dnopbc",false) &&
             clp.getoption(sdbins,"dbins",std::string("50")) &&
             clp.getoption(sdfold,"dfold",std::string("")) &&
             clp.getoption(sdrange,"drange",std::string("")) &&
@@ -894,7 +896,7 @@ int main(int argc, char **argv)
                         case 2: va=drangeaz; vb=drangebz; break;
                     }
 
-                    if (vb-va == 1) { std::cout<<"PERIODIC DENSITY APPLIED ALONG AXIS " << i<<"\n"; hgo[i].walls=HGBPeriodic; }
+                    if (vb-va == 1 && !fdnopbc) { std::cout<<"PERIODIC DENSITY APPLIED ALONG AXIS " << i<<"\n"; hgo[i].walls=HGBPeriodic; }
                     else { hgo[i].walls=HGBHard; }
 
 
@@ -951,7 +953,7 @@ int main(int argc, char **argv)
                 //go to scaled coordinates
                 didata[0]=al1[i].x;  didata[1]=al1[i].y; didata[2]=al1[i].z;
                 micmat(ICM,didata[0],didata[1],didata[2]);
-                if (ldalign=="") micpbc(1./dfoldx,1./dfoldy,1./dfoldz,didata[0],didata[1],didata[2]);  //if we have aligned, we ALREADY HAVE APPLIED PBC AT THE GOOD MOMENT!
+                if (ldalign=="" && !fdnopbc) micpbc(1./dfoldx,1./dfoldy,1./dfoldz,didata[0],didata[1],didata[2]);  //if we have aligned, we ALREADY HAVE APPLIED PBC AT THE GOOD MOMENT!
                 ndh<<didata;
             }
         }
