@@ -1662,10 +1662,10 @@ int main(int argc, char **argv)
         double dfout; ndh.get_outliers(dfout);
         std::cerr<<ndh.samples()*(1.-dfout)/npfr<<" smpl inside\n"<<dfout<<" outliers\n";
         std::cerr<<svolume/(ndh.samples()*(1.-dfout)/npfr)<<" vol per at\n";
-        std::cerr<<nb.sum()/nb.size()<<" integral\n"<<nb.size()<<" che oh\n";
+        std::cerr<<nb.sum()/nb.size()<<" integral\n"<<nb.size()<<"\n";
 
-        nb*=ndh.samples()/npfr*xvoxel/(vvoxel*a2b3)* (svolume*a2b3)/(svolume*a2b3);
-        //nb*=(drangebx-drangeax)*(drangeby-drangeay)*(drangebz-drangeaz)/(dfoldx*dfoldy*dfoldz)*ndh.samples()/npfr /(vvoxel*nb.size()); //normalization so that int dx dy dz v(x,y,z)=N
+        //normalization so that int dx dy dz rho(x,y,z) = <N> mean number of particles in the box
+        nb*=ndh.samples()/npfr*xvoxel/(vvoxel*a2b3);
         double dmax=nb.max(), dmin=nb.min();
 
         //prints out in CUBE format
