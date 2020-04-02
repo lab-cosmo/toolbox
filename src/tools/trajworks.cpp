@@ -1219,10 +1219,10 @@ int main(int argc, char **argv)
 
             if (lgdr1=="*") al1=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lgdr1) { al1.push_back(af.ats[i]); il1.push_back(i); }
+                if (chk_sel(af.ats[i].name,lgdr1)) { al1.push_back(af.ats[i]); il1.push_back(i); }
             if (lgdr2=="*") al2=af.ats;
             else for (unsigned long i=0; i<af.ats.size(); ++i)
-                if (af.ats[i].name==lgdr2) { al2.push_back(af.ats[i]); il2.push_back(i); }
+                if (chk_sel(af.ats[i].name,lgdr2)) { al2.push_back(af.ats[i]); il2.push_back(i); }
 
             gdrw=0.0;
             for (unsigned long i=0; i<al1.size(); ++i)
