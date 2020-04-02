@@ -1229,7 +1229,7 @@ int main(int argc, char **argv)
                 for (unsigned long j=0; j<al2.size(); ++j)
             {
                 if (il1[i]==il2[j]) continue;
-                gdrw+=1.0;
+                gdrw+=1.0;   // this keeps track of the total number of pair interactions, even those outside the cutoff
 
                 dx=al1[i].x-al2[j].x;
                 dy=al1[i].y-al2[j].y;
@@ -1240,7 +1240,7 @@ int main(int argc, char **argv)
 
                 if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
                 d12=dx*dx+dy*dy+dz*dz;
-                if (d12>cog2||d12==0.) continue;
+                if (d12>cog2 || d12==0.) continue;
                 hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
             }
             if (gdrw>0.0) gdrwtot+=statweight*gdrw;   // total weight to be considered when renormalizing g(r)
@@ -1425,7 +1425,10 @@ int main(int argc, char **argv)
         //bins = bins/ndata -> Int bins = 1
         //!!CHECK NORMALIZATION IN CASE SAME SPECIES ARE USED!!
         if (cvolume == 0.) gr*=4./3.*constant::pi*cogdr*cogdr*cogdr;
+        // samples contains just the samples that have been added to the histogram, but there are 
+        // interactions outside the range, and these are counted in gdrwtot
         else gr*=hgdr.samples()/(gdrwtot/cvolume);
+                
         for (unsigned long i=0; i<r.size(); ++i)
             (*ogdr)<<r[i]<<" "<<gr[i]<<std::endl;
     }
