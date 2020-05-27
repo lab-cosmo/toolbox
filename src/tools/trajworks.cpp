@@ -323,7 +323,7 @@ void banner()
             << " -hwin     window for all histo (triangle|box|delta|gauss-[1,2,3,5]) [delta]    \n"
             << " -hwinfac  size of the window, as a function of the bin size [1.0]              \n"
             << " -weights file read statistical log-weights of frames from an external file     \n"
-            << " ## g(r) OPTIONS:   activate by hgo                                             \n"
+            << " ## g(r) OPTIONS:   activate by -gr                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
             << " -gr2      label of the second specie [*]                                       \n"
             << " -grmax    maximum distance to compute g(r) [5]                                 \n"
