@@ -31,7 +31,7 @@ bool ReadXYZFrame(std::istream& istr, AtomFrame& curfr)
         ss.clear(); ss<<curfr.comment;
         std::string dummy;
         double A, B, C, a, b, c;
-        ss >> dummy >> dummy >> A >> B >> C >> a >> b >> c;		
+        ss >> dummy >> dummy >> A >> B >> C >> a >> b >> c;
         //TODO - convert properly also when it's non-orthorhombic
         curfr.nprops["axx"] = A;
         curfr.nprops["ayy"] = B; 
@@ -52,7 +52,7 @@ bool ReadXYZFrame(std::istream& istr, AtomFrame& curfr)
     
     for (i=0; i<nat && getline(istr, line); ++i)
     {
-        ss.clear(); ss<<line;
+        ss=std::stringstream(); ss<<line;
         curat.props.resize(0);
         ss>>curat.name>>curat.x>>curat.y>>curat.z;
         if (ss.bad()) ERROR("Read failed in frame "<<curfr.index<<", on atom "<<i<<".");
