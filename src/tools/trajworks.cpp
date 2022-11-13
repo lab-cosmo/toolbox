@@ -326,6 +326,7 @@ void banner()
             << " ## g(r) OPTIONS:   activate by -gr                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
             << " -gr2      label of the second specie [*]                                       \n"
+            << " -grrep    replicate cell before computing [1]                                  \n"
             << " -grmax    maximum distance to compute g(r) [5]                                 \n"
             << " -grbins   number of bins in the histogram for g(r) [100]                       \n"
             << " ## g3b(r,r',w) OPTIONS:   activate by -g3b                                     \n"
@@ -389,7 +390,7 @@ int main(int argc, char **argv)
 
     bool fgdr=false, fg3b=false, fg3bself=false, fvvac=false, fpdb=false, fxyz=false, fdlp=false, fmsd=false, fdipole=false, fdens=false, fdnopbc=false, fdtraj=false, fdproj=false, fdpov=false, fpca=false, fpcaxyz=false, fpcanocov=false, fvbox=false, fcv=false, fpd=false, fvvacbox=false, fp3d=false, fp3dinv=false, funwrap=false, fpproj=false, fthermal=false, fcharge=false, fhelp;
     std::string lgdr1, lgdr2, lg3b1, lg3b2, lg3b3, dummy, lvvac, lmsd, ldens, ldalign, lpcalign, lpcat, prefix, fbox, fqat, sdbins, sdfold, sdrange, fref, lpdat,shwin, lp3dat, flab, lppat1, lppat2, lcv, fweights;
-    double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins, gwbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
+    double cogdr, dt, densw, pdmax, p3dmax, hwinfac; unsigned long fstart,fstop,fstep,gdrbins,nrepgdr, gwbins, vvlag, msdlag, ftpad, dbinsx, dbinsy, dbinsz, dfoldx, dfoldy, dfoldz, cvtype, pdbins, p3dbins;
     double drangeax, drangebx,  drangeay, drangeby,  drangeaz, drangebz;
     std::vector<double> cvpars, pdvec; std::vector<unsigned long> vvindex;
     bool fok=
@@ -415,6 +416,7 @@ int main(int argc, char **argv)
             clp.getoption(fgdr,"gr",false) &&
             clp.getoption(lgdr1,"gr1",std::string("*")) &&
             clp.getoption(lgdr2,"gr2",std::string("*")) &&
+            clp.getoption(nrepgdr,"grrep",(unsigned long) 1) &&
             clp.getoption(cogdr,"grmax",5.) &&
             clp.getoption(gdrbins,"grbins",(unsigned long)100) &&
             //g3b(r,r',w) options
@@ -1231,17 +1233,42 @@ int main(int argc, char **argv)
                 if (il1[i]==il2[j]) continue;
                 gdrw+=1.0;   // this keeps track of the total number of pair interactions, even those outside the cutoff
 
-                dx=al1[i].x-al2[j].x;
-                dy=al1[i].y-al2[j].y;
-                dz=al1[i].z-al2[j].z;
-                micmat(ICM,dx,dy,dz);
-                micpbc(1.,1.,1.,dx,dy,dz);
-                micmat(CM,dx,dy,dz);
+                if (nrepgdr>1) {
+                // creates some virtual replicas to simulate a g(r) until a longer distance while using a MIC.
+                // NB: there will be artifacts due to periodicity, but at least g(r) won't go to zero
+                for (unsigned long ir0=0; ir0<nrepgdr; ++ir0)
+                for (unsigned long ir1=0; ir1<nrepgdr; ++ir1)
+                for (unsigned long ir2=0; ir2<nrepgdr; ++ir2)
+                {
+                    dx=al1[i].x-al2[j].x+ir0*CM(0,0)+ir1*CM(0,1)+ir2*CM(0,2);
+                    dy=al1[i].y-al2[j].y+ir0*CM(1,0)+ir1*CM(1,1)+ir2*CM(1,2);
+                    dz=al1[i].z-al2[j].z+ir0*CM(2,0)+ir1*CM(2,1)+ir2*CM(2,2);
+                    dx/=nrepgdr; dy/=nrepgdr; dz/=nrepgdr;
+                    micmat(ICM,dx,dy,dz);
+                    micpbc(1.,1.,1.,dx,dy,dz);
+                    micmat(CM,dx,dy,dz);
+                    dx*=nrepgdr; dy*=nrepgdr; dz*=nrepgdr;
 
-                if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
-                d12=dx*dx+dy*dy+dz*dz;
-                if (d12>cog2 || d12==0.) continue;
-                hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
+                    if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
+                    d12=dx*dx+dy*dy+dz*dz;
+                    if (d12>cog2 || d12==0.) continue;
+                    hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
+                }
+                }
+                else
+                {   // avoids unnecessary loops 
+                    dx=al1[i].x-al2[j].x;
+                    dy=al1[i].y-al2[j].y;
+                    dz=al1[i].z-al2[j].z;
+                    micmat(ICM,dx,dy,dz);
+                    micpbc(1.,1.,1.,dx,dy,dz);
+                    micmat(CM,dx,dy,dz);
+                    
+                    if (dx>cogdr || dy> cogdr || dz>cogdr) continue;
+                    d12=dx*dx+dy*dy+dz*dz;
+                    if (d12>cog2 || d12==0.) continue;
+                    hgdr.add(sqrt(d12),statweight);  // this has the possibility of being weighted
+                }
             }
             if (gdrw>0.0) gdrwtot+=statweight*gdrw;   // total weight to be considered when renormalizing g(r)
         }
