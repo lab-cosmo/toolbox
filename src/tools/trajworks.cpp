@@ -322,7 +322,7 @@ void banner()
             << " -lab file reads atoms labels from file ( lab1 lab2 lab3....  )                 \n"
             << " -hwin     window for all histo (triangle|box|delta|gauss-[1,2,3,5]) [delta]    \n"
             << " -hwinfac  size of the window, as a function of the bin size [1.0]              \n"
-            << " -weights file read statistical log-weights of frames from an external file     \n"
+            << " -weights file read statistical weights of frames from an external file     \n"
             << " ## g(r) OPTIONS:   activate by -gr                                             \n"
             << " -gr1      label of the first specie  [*]                                       \n"
             << " -gr2      label of the second specie [*]                                       \n"
@@ -749,7 +749,7 @@ int main(int argc, char **argv)
         { ffirstcell=false;  for (int i=0;i<3; ++i) for (int j=0;j<3;++j) ifbox>>CBOX(j,i); if (!ifbox.good()) ERROR("Format error in box file."); }
         if (fweights!="")
         {
-            ifweights >> statweight; statweight = exp(statweight); // weights are stored as logs
+            ifweights >> statweight;
             if (!ifweights.good()) ERROR("Format error in weights file.");
         }
         if (fqat!="")
