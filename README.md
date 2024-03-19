@@ -35,5 +35,11 @@ cd src
 ARCH=xxx make
 ```
 
+e.g. if you want to build with regex support and have boost-regex
+installed, you can use 
+
+```
+ARCH=boost make
+```
 
 
