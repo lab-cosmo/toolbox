@@ -1,8 +1,8 @@
 *toolbox* library and utilities
 ===============================
 
-A set of utilities and library functions to facilitate writing of 
-scientific codes -- with a particular focus on the analysis of 
+A set of utilities and library functions to facilitate writing of
+scientific codes -- with a particular focus on the analysis of
 atomistic simulations.
 
 Compilation and dependencies
@@ -10,7 +10,7 @@ Compilation and dependencies
 
 Compilation of the *toolbox* libraries and tools should not be too
 difficult. It requires that FFTW3 and LAPACK libraries are installed
-on the system, and a C++ compiler. 
+on the system, and a C++ compiler.
 
 On a Ubuntu system the dependencies can be satisfied by installing
 
@@ -26,7 +26,7 @@ make
 
 The resulting executables will be generated in `bin`.
 
-One can modify the default parameters for the compiler and library 
+One can modify the default parameters for the compiler and library
 paths by creating a arch.xxx file in the main path, and specifying
 which architecture file to load by running
 
@@ -36,10 +36,13 @@ ARCH=xxx make
 ```
 
 e.g. if you want to build with regex support and have boost-regex
-installed, you can use 
+installed, you can use
 
 ```
 ARCH=boost make
 ```
 
+Maintainers
+-----------
 
+This project is [maintained](https://github.com/lab-cosmo/.github/blob/main/Maintainers.md) by [@ceriottm](https://github.com/ceriottm), who will reply to issues and pull requests opened on this repository as soon as possible. You can mention them directly if you did not receive an answer after a couple of days.
